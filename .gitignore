@@ -1,5 +1,5 @@
-# Ignore the 6502 folder
-6502/
+# Ignore the larger schematic file
+6502_eater_schematic.png
 
 # Ignore build folder and .vscode file And Vendor folder
 vendor
