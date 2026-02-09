@@ -1,6 +1,10 @@
 # 6502-Emulator
 
-This is a Emulator based on Ben Eaters 6502 computer and schematics with Serial interface
+![RUNNING Version of the Emulator in 8-Bit](6502/Debug_output_window_running.png)
+
+This is a Emulator based on Ben Eaters 6502 computer and first schematic without the Serial interface, I have started the modeling for that interface.
+
+![Ben Eater Schematic 6502 Computer](6502/6502_First_schematic1.png)
 
 ![Ben Eater Schematic 6502 Computer](6502/6502_eater_schematic1.png)
 
@@ -8,7 +12,7 @@ A cycle-accurate, component-level emulator of the Ben Eater 6502 breadboard comp
 
 (Emulator running "Hello, world!" with blinking block cursor)
 
-### Table of Contents
+📖 Table of Contents
 
 About The Project
 
@@ -36,7 +40,7 @@ LCD Controller State Machine: The ST7066U controller is emulated in detail, incl
 
 ROM Generation: Includes a custom C++ based assembler/generator to create binary ROM images directly from code.
 
-### Hardware Architecture
+⚡ Hardware Architecture
 
 The emulator replicates the following schematic:
 
@@ -44,90 +48,43 @@ The emulator replicates the following schematic:
 
 Emulated Components
 
-Component
-
-Type
-
-Function
-
-Notes
-
-W65C02S
-
-CPU
-
-Central Processing Unit
-
-Full instruction set supported (CMOS).
-
-W65C22
-
-VIA
-
-Versatile Interface Adapter
-
-Handles I/O for the LCD (Port A/B).
-
-W65C51
-
-ACIA
-
-Asynchronous Comm Interface
-
-UART for serial communication.
-
-NHD-0216K1Z
-
-LCD
-
-2x16 Character Display
-
-ST7066U Controller, wired in 4-bit mode.
-
-AT28C256
-
-ROM
-
-32KB EEPROM
-
-Mapped to $8000 - $FFFF.
-
-62256
-
-RAM
-
-32KB SRAM
-
-Mapped to $0000 - $3FFF.
-
-# Directory Structure
+Component   |     Type    |           Function            |          Notes                              |
+________________________________________________________________________________________________________|
+W65C02S     |    CPU      |   Central Processing Unit     |    Full instruction set supported (CMOS).   |
+W65C22      |    VIA      |   Versatile Interface Adapter |    Handles I/O for the LCD (Port A/B).      |
+W65C51      |    ACIA     |   Asynchronous Comm Interface |    UART for serial communication.           |
+NHD-0216K1Z |    LCD      |   2x16 Character Display      |    ST7066U Controller, wired in 4-bit mode. |
+AT28C256    |    ROM      |   32KB EEPROM                 |    Mapped to $8000 - $FFFF.                 |
+62256       |    RAM      |   32KB SRAM                   |    Mapped to $0000 - $3FFF.                 |
+________________________________________________________________________________________________________|
+📂 Directory Structure
 
 The project is organized by hardware device types, drivers, and UI components.
 
 (Project Source Tree)
 
 src/
-├── devices/             # Component-level emulation
-│   ├── cpu/             # W65C02 implementation
-│   ├── io/              # Peripheral chips (VIA, ACIA)
-│   ├── logic/           # 74HC00 address decoding helpers
-│   ├── memory/          # RAM and ROM classes
-│   └── video/           # LCD (NHD-0216K1Z) logic
-├── driver/              # Mainboard wiring
-│   ├── mainboard.cpp    # "Solders" the chips together
-│   └── mainboard.h      # Memory map definitions
-├── emu/                 # Core emulation framework (Bus, Types, Device base)
-├── ui/                  # Graphical User Interface
-│   ├── views/           # Specific windows (Debug View, Memory View)
-│   └── renderer.cpp     # SDL2/OpenGL backend
-├── tools/               # Development utilities
-│   └── rom_generator.cpp # Custom C++ Assembler for ROM generation
-└── main.cpp             # Application Entry Point
+├── devices/                # Component-level emulation
+│   ├── cpu/                # W65C02 implementation
+│   ├── io/                 # Peripheral chips (VIA, ACIA)
+│   ├── logic/              # 74HC00 address decoding helpers
+│   ├── memory/             # RAM and ROM classes
+│   └── video/              # LCD (NHD-0216K1Z) logic
+├── driver/                 # Mainboard wiring
+│   ├── mainboard.cpp       # "Solders" the chips together
+│   └── mainboard.h         # Memory map definitions
+├── emu/                    # Core emulation framework (Bus, Types, Device base)
+├── ui/                     # Graphical User Interface
+│   ├── views/              # Specific windows (Debug View, Memory View)
+│   └── renderer.cpp        # SDL2/OpenGL backend
+├── tools/                  # Development utilities
+│   └── rom_generator.cpp   # Custom C++ Assembler for ROM generation
+└── main.cpp                # Application Entry Point
 
 
- ##Features
+✨ Features
 
- ##Accurate LCD Emulation
+🖥️ Accurate LCD Emulation
 
 Unlike generic text outputs, this emulator simulates the ST7066U controller.
 
@@ -155,27 +112,27 @@ Includes a rom_generator tool that allows you to write "Assembly-in-C++". It com
 
 Prerequisites
 
-C++ Compiler (GCC/Clang/MSVC) supporting C++17.
+* **C++ Compiler** (GCC/Clang/MSVC) supporting C++17.
 
-Make (or CMake if configured).
+* **Make** (or CMake if configured).
 
-Libraries:
+* **Libraries:**
 
-SDL2
+    * **SDL2**
 
-OpenGL / GLFW
+    * **OpenGL / GLFW**
 
-Dear ImGui (Included in vendor/)
+    * **Dear ImGui** (Included in vendor/)
 
 Installation
 
-Clone the repository
+1.  **Clone the repository**
 
 git clone [https://github.com/yourusername/6502-emulator.git](https://github.com/yourusername/6502-emulator.git)
 cd 6502-emulator
 
 
-Generate the ROM
+2. **Generate the ROM**
 Before running the emulator, you must generate the firmware.
 
 # Compile and run the generator
@@ -184,20 +141,20 @@ g++ tools/rom_generator.cpp -o rom_gen
 # This creates 'rom.bin' in the root directory
 
 
-Build the Emulator
+3. **Build the Emulator**
 
 make clean
 make
 
 
-Run
+4. **Run**
 
 ./build/eater.exe
 
 
 📸 Media Gallery
 
-CPU & Stack Inspector
+**CPU & Stack Inspector**
 
 Real-time view of the processor internals and stack frames.
 (CPU State and Stack Visualization)
