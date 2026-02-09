@@ -41,7 +41,8 @@ private:
     w65c51        m_acia; // U7 (ACIA)
     nhd_0216k1z   m_lcd; // U3 (LCD)
 
-    bool m_last_e_state = false;
+    u8   m_port_b_data = 0x00;
+    bool m_last_e_state = false;    // To detect the edge of the Enable pin
 
     // --- Wiring Logic ---
     void map_setup(class address_map& map);

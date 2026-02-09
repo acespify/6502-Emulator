@@ -423,39 +423,75 @@ void DebugView::draw_memory_window() {
 // ============================================================================
 void DebugView::draw_lcd_window() {
     ImGui::Begin("LCD Display (U3)");
+
+    // 1. Set Retro Colors (Yellow-Green Background, Dark Grey Text)
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.60f, 0.80f, 0.20f, 1.0f)); // #99CC33
+    ImGui::PushStyleColor(ImGuiCol_Text,    ImVec4(0.10f, 0.15f, 0.05f, 1.0f)); // Dark Green/Grey
+
+    // 2. Create the LCD Screen Box
+    ImGui::BeginChild("Screen", ImVec2(0, 80), true); // 80px height
     
-    // Simulate the physical look of the NHD-0216K1Z
-    //  NHD-0216K1Z Datasheet - "Blue STN Negative / Transmissive"
-    // Though commonly used with Green/Black in hobby kits. Let's do Green on Black.
+    // Set Font Scale (Make it look blocky/retro if possible)
+    ImGui::SetWindowFontScale(2.0f);
 
-    // Background color (Dark Green/Black)
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.15f, 0.1f, 1.0f));
-    ImGui::BeginChild("Screen", ImVec2(300, 80), true);
+    const auto& lines = m_lcd->get_display_lines();
+    u8 cursor_addr = m_lcd->get_cursor_addr();
+    bool cursor_vis = m_lcd->is_cursor_on();
 
-    if (m_lcd) {
-        const auto& lines = m_lcd->get_display_lines();
+    // Loop through 2 lines
+    for (int row = 0; row < 2; row++) {
+        // Construct the line string
+        std::string line_text = lines[row];
         
-        // Font setup: Scale up to look like a dot matrix
-        ImGui::SetWindowFontScale(2.0f);
-        
-        // Text Color (Bright Green/Yellowish)
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.9f, 0.6f, 1.0f));
-        
-        // Draw Line 1
-        ImGui::Text("%s", lines[0].c_str());
-        
-        // Draw Line 2
-        ImGui::Text("%s", lines[1].c_str());
-        
-        ImGui::PopStyleColor(); // Pop Text Color
+        // Print the line
+        ImGui::Text("%s", line_text.c_str());
+
+        // --- DRAW CURSOR MANUALLY ---
+        if (cursor_vis) {
+            int cursor_row = (cursor_addr >= 0x40) ? 1 : 0;
+            int cursor_col = (cursor_addr & 0x0F);
+
+            if (row == cursor_row && cursor_col < 16) {
+                // Get position of the start of the text line
+                ImVec2 line_pos = ImGui::GetItemRectMin();
+                
+                // Approximate character size (Monospace font is best for this)
+                float char_w = ImGui::GetFontSize() * 0.5f; 
+                float char_h = ImGui::GetFontSize();
+
+                // Calculate exact screen coordinates for the cursor
+                ImVec2 cursor_screen_pos = ImVec2(
+                    line_pos.x + (cursor_col * char_w), 
+                    line_pos.y
+                );
+
+                // Draw Blinking Block
+                // Blink rate: Every 0.5 seconds
+                bool blink_state = (ImGui::GetTime() - (int)ImGui::GetTime()) > 0.5f;
+                
+                if (m_lcd->is_blink_on() && blink_state) {
+                    ImGui::GetWindowDrawList()->AddRectFilled(
+                        cursor_screen_pos,
+                        ImVec2(cursor_screen_pos.x + char_w, cursor_screen_pos.y + char_h),
+                        IM_COL32(20, 40, 10, 255) // Dark Green Block
+                    );
+                }
+                // If blink is off but cursor is on, draw underscore (optional)
+                else if (!m_lcd->is_blink_on()) {
+                     ImGui::GetWindowDrawList()->AddRectFilled(
+                        ImVec2(cursor_screen_pos.x, cursor_screen_pos.y + char_h - 2),
+                        ImVec2(cursor_screen_pos.x + char_w, cursor_screen_pos.y + char_h),
+                        IM_COL32(20, 40, 10, 255)
+                    );
+                }
+            }
+        }
     }
 
     ImGui::EndChild();
-    ImGui::PopStyleColor(); // Pop Bg Color
+    ImGui::PopStyleColor(2); // Restore Colors
 
-    // Datasheet Info
-    ImGui::TextDisabled("Controller: ST7066U (4-Bit Mode)");
-
+    ImGui::TextDisabled("Controller: ST7066U (8-Bit Mode)");
     ImGui::End();
 }
 

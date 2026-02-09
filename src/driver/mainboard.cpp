@@ -68,22 +68,32 @@ void mb_driver::init() {
     // ========================================================================
     // 3. WIRE THE SCHEMATIC (U5 <-> U3)
     // ========================================================================
-    // U5 (VIA) Port B connects to U3 (LCD).
-    // Schematic: PB0->RS, PB1->RW, PB2->E, PB4-7->DB4-7.
-    
+    // VIA Port B: DATA BUS (Connected to LCD D0-D7)
     m_via.set_port_b_callback([this](u8 data) {
+        // Just latch the data. The LCD doesn't read it until E pulses
+        m_port_b_data = data;
+    });
+    
+    // U5 (VIA) Port A connects to U3 (LCD).
+    //  Bit 5: RS (Register Select)
+    //  Bit 6: RW (Read/Write)
+    //  Bit 7: E  (Enable)
+    
+    m_via.set_port_a_callback([this](u8 data) {
         // Extract Control Lines (Lower 3 bits)
-        bool rs = (data & 0x01); // PB0
-        bool rw = (data & 0x02); // PB1
-        bool e  = (data & 0x04); // PB2
+        bool rs = (data & 0x20); // Bit 5
+        bool rw = (data & 0x40); // Bit 6
+        bool e  = (data & 0x80); // Bit 7
         
-        // Extract Data Nibble (Upper 4 bits)
-        // The LCD expects the data on its DB4-DB7 lines.
-        // Since we wired PB4-PB7 to DB4-DB7, the value is already aligned 
-        // in the upper nibble of 'data'.
-        u8 nibble = (data & 0xF0);
-        
-        m_lcd.write_4bit(nibble, rs, rw, e);
+        // The LCD executes on the FALLING EDGE of Enable (High -> Low).
+        if (m_last_e_state && !e) {
+            // Trigger the 8-bit write!
+            // We send the data sitting on Port B, using the flags from Port A.
+
+            m_lcd.write_8bit(m_port_b_data, rs, rw);
+            //m_lcd.write_4bit(m_port_b_data, rs, rw, e);
+        }
+        m_last_e_state = e; // Store for next time
     });
 
     // U5 Port A is UNUSED (Schematic check: No connections to LCD)
@@ -134,12 +144,13 @@ void mb_driver::run(int cycles) {
     // Check how many cycles are LEFT
     int cycles_left = m_cpu->icount_get();
 
-    printf("PC: %04X | SP: %02X | Opcode: %02X | Requested: %d | Left: %d\n", 
+    // For Debug purposes
+    /*printf("PC: %04X | SP: %02X | Opcode: %02X | Requested: %d | Left: %d\n", 
             m_cpu->get_pc(),
             m_cpu->get_sp(),
             m_cpu->debug_peek(m_cpu->get_pc()),
             cycles,
-            cycles_left);
+            cycles_left);*/
 }
 
 // ============================================================================

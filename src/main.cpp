@@ -1,6 +1,8 @@
 #include <iostream>
 #include <vector>
 #include <cstring>
+#include <chrono>
+#include <thread>
 
 // UI Includes
 #include "ui/renderer.h"
@@ -35,14 +37,20 @@ int main(int argc, char* argv[]) {
     // Note: We now pass the LCD pointer too! You might need to update DebugView constructor later.
     DebugView debugger(&computer);
 
+    // Timing Variables
+    // Target: 60FPS (16.66ms per frame)
+    const auto target_frame_duration = std::chrono::microseconds(16667);
+
     // 4. Main Loop
     while (!renderer.should_close()) {
+        auto frame_start = std::chrono::steady_clock::now();
+
         renderer.begin_frame();
 
         // CPU Execution Logic
         if (!is_paused || step_req) {
             // Speed: 1MHz = 1,000,000 cycles / 60 FPS = ~16667 cycles per frame
-            int cycles = step_req ? 20 : 16667;
+            int cycles = step_req ? 1 : 16667;
             
             computer.run(cycles);
             
@@ -56,6 +64,13 @@ int main(int argc, char* argv[]) {
         // debugger.draw_lcd_window(computer.get_lcd()); 
 
         renderer.end_frame();
+
+        auto frame_end = std::chrono::steady_clock::now();
+        auto elapsed = frame_end - frame_start;
+
+        if (elapsed < target_frame_duration) {
+            std::this_thread::sleep_for(target_frame_duration - elapsed);
+        }
     }
 
     renderer.shutdown();
