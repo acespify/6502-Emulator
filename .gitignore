@@ -1,0 +1,11 @@
+# Ignore the 6502 folder
+6502/
+
+# Ignore build folder and .vscode file And Vendor folder
+vendor
+.vscode/
+build/
+
+# Ignore rom-generator and rom.bin
+rom_generator.exe
+rom.bin
