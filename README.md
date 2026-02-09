@@ -49,14 +49,14 @@ The emulator replicates the following schematic:
 Emulated Components
 
 |Component   |     Type    |           Function            |          Notes                              |
-| :--- | :---: | :---: | :---: |
+| :--- | :---: | :---: | :--- |
 |W65C02S     |    CPU      |   Central Processing Unit     |    Full instruction set supported (CMOS).   |
 |W65C22      |    VIA      |   Versatile Interface Adapter |    Handles I/O for the LCD (Port A/B).      |
 |W65C51      |    ACIA     |   Asynchronous Comm Interface |    UART for serial communication.           |
 |NHD-0216K1Z |    LCD      |   2x16 Character Display      |    ST7066U Controller, wired in 4-bit mode. |
 |AT28C256    |    ROM      |   32KB EEPROM                 |    Mapped to $8000 - $FFFF.                 |
 |62256       |    RAM      |   32KB SRAM                   |    Mapped to $0000 - $3FFF.                 |
-| :--- | :---: | :---: | :--- |
+
 
 
 📂 **Directory Structure**
