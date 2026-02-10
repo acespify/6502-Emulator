@@ -65,32 +65,25 @@ Emulated Components
 The project is organized by hardware device types, drivers, and UI components.
 
 (Project Source Tree)
-
+```
 src/
-|-- devices/                # Component-level emulation
-│   |-- cpu/                # W65C02 implementation
-│   |-- io/                 # Peripheral chips (VIA, ACIA)
-│   |-- logic/              # 74HC00 address decoding helpers
-│   |-- memory/             # RAM and ROM classes
-│   `-- video/              # LCD (NHD-0216K1Z) logic
-|-- driver/                 # Mainboard wiring
-│   |-- mainboard.cpp       # "Solders" the chips together
-│   `-- mainboard.h         # Memory map definitions
-|-- emu/                    # Core emulation framework (Bus, Types, Device base)
-|-- ui/                     # Graphical User Interface
-│   |-- views/              # Specific windows (Debug View, Memory View)
-│   `-- renderer.cpp        # SDL2/OpenGL backend
-|-- tools/                  # Development utilities
-`-- vendor                  # Vendor directories used for Serial, Windows
-|    |--GLFW
-|    |   |-- include
-|    |   `-- GLFW
-|    `-- lib
-|-- asio
-|-- imgui
-|   `-- backends
-`--stb_image   
-
+├── devices/                # Component-level emulation
+│   ├── cpu/                # W65C02 implementation
+│   ├── io/                 # Peripheral chips (VIA, ACIA)
+│   ├── logic/              # 74HC00 address decoding helpers
+│   ├── memory/             # RAM and ROM classes
+│   └── video/              # LCD (NHD-0216K1Z) logic
+├── driver/                 # Mainboard wiring
+│   ├── mainboard.cpp       # "Solders" the chips together
+│   └── mainboard.h         # Memory map definitions
+├── emu/                    # Core emulation framework (Bus, Types, Device base)
+├── ui/                     # Graphical User Interface
+│   ├── views/              # Specific windows (Debug View, Memory View)
+│   └── renderer.cpp        # SDL2/OpenGL backend
+├── tools/                  # Development utilities
+│   └── rom_generator.cpp   # Custom C++ Assembler for ROM generation
+└── main.cpp                # Application Entry Point
+```
 
 ✨ Features
 
