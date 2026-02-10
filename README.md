@@ -4,7 +4,7 @@
 
 This is a Emulator based on Ben Eaters 6502 computer and first schematic without the Serial interface, I have started the modeling for that interface.
 
-![Ben Eater First Schematic 6502 Computer](6502/6502_First_schematic1.png)
+![Ben Eater First Schematic 6502 Computer](6502/6502_First-schematic.png)
 
 Ben's Schematic with the Serial Interface 
 ![Ben Eater Schematic 6502 Computer](6502/6502_eater_schematic1.png)
