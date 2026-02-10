@@ -66,23 +66,47 @@ The project is organized by hardware device types, drivers, and UI components.
 
 (Project Source Tree)
 ```
-src/
-├── devices/                # Component-level emulation
-│   ├── cpu/                # W65C02 implementation
-│   ├── io/                 # Peripheral chips (VIA, ACIA)
-│   ├── logic/              # 74HC00 address decoding helpers
-│   ├── memory/             # RAM and ROM classes
-│   └── video/              # LCD (NHD-0216K1Z) logic
-├── driver/                 # Mainboard wiring
-│   ├── mainboard.cpp       # "Solders" the chips together
-│   └── mainboard.h         # Memory map definitions
-├── emu/                    # Core emulation framework (Bus, Types, Device base)
-├── ui/                     # Graphical User Interface
-│   ├── views/              # Specific windows (Debug View, Memory View)
-│   └── renderer.cpp        # SDL2/OpenGL backend
-├── tools/                  # Development utilities
-│   └── rom_generator.cpp   # Custom C++ Assembler for ROM generation
-└── main.cpp                # Application Entry Point
+6502/
+├── build/               # Compiled binaries
+├── src/
+│   ├── devices/         # Hardware Component Emulation
+│   │   ├── cpu/
+│   │   │   ├── m6502.cpp      # W65C02S Core Logic
+│   │   │   └── m6502.h
+│   │   ├── io/
+│   │   │   ├── w65c22.cpp     # VIA Implementation
+│   │   │   ├── w65c22.h
+│   │   │   ├── w65c51.cpp     # ACIA Implementation
+│   │   │   └── w65c51.h
+│   │   ├── logic/
+│   │   │   └── 74hc00.h       # NAND Gate logic
+│   │   ├── memory/
+│   │   │   ├── 28c256.cpp     # EEPROM
+│   │   │   └── 62256.cpp      # SRAM
+│   │   └── video/
+│   │       ├── nhd_0216k1z.cpp # LCD Controller (ST7066U)
+│   │       └── nhd_0216k1z.h
+│   ├── driver/
+│   │   ├── mainboard.cpp      # System wiring (Address Map, Interrupts)
+│   │   └── mainboard.h
+│   ├── emu/                   # Emulation Framework (Base classes)
+│   │   ├── device.h
+│   │   ├── di_execute.h
+│   │   ├── di_memory.h
+│   │   ├── machine.h
+│   │   ├── map.h
+│   │   └── types.h
+│   ├── ui/                    # Graphical User Interface
+│   │   ├── views/
+│   │   │   ├── debug_view.cpp # Debugger Windows & Tools
+│   │   │   └── debug_view.h
+│   │   ├── renderer.cpp       # OpenGL/SDL/ImGui Backend
+│   │   └── renderer.h
+│   └── main.cpp               # Entry Point
+├── tools/
+│   └── rom_generator.cpp      # C++ Assembly Tool for Firmware
+├── vendor/                    # Third-party libraries (ImGui, GLFW, etc.)
+└── Makefile                   # Build Configuration
 ```
 
 ✨ Features
@@ -174,4 +198,4 @@ Demonstration of the 4-bit interface driving the display.
 
 License
 
-Distributed under the MIT License. See LICENSE for more information.
+Distributed under the MIT License. See `LICENSE` for more information.
