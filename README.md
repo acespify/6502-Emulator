@@ -4,8 +4,9 @@
 
 This is a Emulator based on Ben Eaters 6502 computer and first schematic without the Serial interface, I have started the modeling for that interface.
 
-![Ben Eater Schematic 6502 Computer](6502/6502_First_schematic1.png)
+![Ben Eater First Schematic 6502 Computer](6502/6502_First_schematic1.png)
 
+Ben's Schematic with the Serial Interface 
 ![Ben Eater Schematic 6502 Computer](6502/6502_eater_schematic1.png)
 
 A cycle-accurate, component-level emulator of the Ben Eater 6502 breadboard computer. This project simulates the hardware behavior of the W65C02S CPU, W65C22 VIA, and NHD-0216K1Z LCD (in 4-bit mode), wrapped in a modern graphical debugger built with Dear ImGui.
@@ -66,22 +67,29 @@ The project is organized by hardware device types, drivers, and UI components.
 (Project Source Tree)
 
 src/
-├── devices/                # Component-level emulation
-│   ├── cpu/                # W65C02 implementation
-│   ├── io/                 # Peripheral chips (VIA, ACIA)
-│   ├── logic/              # 74HC00 address decoding helpers
-│   ├── memory/             # RAM and ROM classes
-│   └── video/              # LCD (NHD-0216K1Z) logic
-├── driver/                 # Mainboard wiring
-│   ├── mainboard.cpp       # "Solders" the chips together
-│   └── mainboard.h         # Memory map definitions
-├── emu/                    # Core emulation framework (Bus, Types, Device base)
-├── ui/                     # Graphical User Interface
-│   ├── views/              # Specific windows (Debug View, Memory View)
-│   └── renderer.cpp        # SDL2/OpenGL backend
-├── tools/                  # Development utilities
-│   └── rom_generator.cpp   # Custom C++ Assembler for ROM generation
-└── main.cpp                # Application Entry Point
+|-- devices/                # Component-level emulation
+│   |-- cpu/                # W65C02 implementation
+│   |-- io/                 # Peripheral chips (VIA, ACIA)
+│   |-- logic/              # 74HC00 address decoding helpers
+│   |-- memory/             # RAM and ROM classes
+│   `-- video/              # LCD (NHD-0216K1Z) logic
+|-- driver/                 # Mainboard wiring
+│   |-- mainboard.cpp       # "Solders" the chips together
+│   `-- mainboard.h         # Memory map definitions
+|-- emu/                    # Core emulation framework (Bus, Types, Device base)
+|-- ui/                     # Graphical User Interface
+│   |-- views/              # Specific windows (Debug View, Memory View)
+│   `-- renderer.cpp        # SDL2/OpenGL backend
+|-- tools/                  # Development utilities
+`-- vendor                  # Vendor directories used for Serial, Windows
+|    |--GLFW
+|    |   |-- include
+|    |   `-- GLFW
+|    `-- lib
+|-- asio
+|-- imgui
+|   `-- backends
+`--stb_image   
 
 
 ✨ Features
