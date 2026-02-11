@@ -24,6 +24,8 @@ public:
     // Main Draw Loop (Called every frame by Renderer)
     void draw(bool& is_paused, bool& step_request);
 
+    // Getter for the main loop to read
+    int get_target_hz() const { return m_target_hz;}
 private:
     // ----- Hardware Pointers -----
     mb_driver* m_driver;
@@ -36,6 +38,10 @@ private:
     char m_rom_path[256] = "rom.bin";
     char m_status_msg[128] = "System Ready";
 
+    // Speed Control State
+    // Default to 1MHz (1,000,000 Hz)
+    int m_target_hz = 1000000;
+
     // --- Window Visibility Flags ---
     bool m_show_cpu     = true;
     bool m_show_stack   = true;
@@ -44,6 +50,7 @@ private:
     bool m_show_ram     = true;  // Generic Memory Viewer
     bool m_show_lcd     = true;
     bool m_show_rom     = false;
+    bool m_show_speed   = false;
 
     // --- Helper Functions ---
     void draw_menu_bar(bool& is_paused, bool& step_request);
@@ -60,6 +67,7 @@ private:
     void draw_memory_window();  // Skeleton
     void draw_lcd_window();
     void draw_rom_window();
+    void draw_speed_control();
 };
 
 #endif // DEBUG_VIEW_H
