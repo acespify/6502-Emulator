@@ -53,68 +53,75 @@ void mb_driver::init() {
         std::cerr << "[Board] Warning: rom.bin not found. ROM is empty." << std::endl;
     }
 
-    // 2. Setup Address Map
-    // We manually trigger the map setup on the CPU wrapper
-    static address_map main_map;
-    m_cpu->memory_map(main_map);
-    m_cpu->install_map(&main_map); // (Hack: Assign protected member if accessible, or add setter)
-    // Note: If m_map is protected, ensure board_cpu can assign it, or add 'set_map' to m6502_p.
+    // Default to Schematic 1
+    set_machine_type(MachineType::SCHEMATIC_1_BASIC);
 
-    // --- FIX: Force Interrupt Lines Inactive ---
-    // 0 = CLEAR_LINE (Inactive), 1 = ASSERT_LINE (Active)
-    m_cpu->set_input_line(m6502_p::IRQ_LINE, 0); 
-    m_cpu->set_input_line(m6502_p::NMI_LINE, 0);
+    m_cpu->device_start();
+}
 
-    // ========================================================================
-    // 3. WIRE THE SCHEMATIC (U5 <-> U3)
-    // ========================================================================
-    // VIA Port B: DATA BUS (Connected to LCD D0-D7)
-    m_via.set_port_b_callback([this](u8 data) {
-        // Just latch the data. The LCD doesn't read it until E pulses
-        m_port_b_data = data;
-    });
+// ============================================================================
+//  Hardware Configuration Switcher
+// ============================================================================
+void mb_driver::set_machine_type(MachineType type) {
+    m_current_type = type;
     
-    // U5 (VIA) Port A connects to U3 (LCD).
-    //  Bit 5: RS (Register Select)
-    //  Bit 6: RW (Read/Write)
-    //  Bit 7: E  (Enable)
+    // 1. Reset Internal State
+    m_last_e_state = false;
+    m_port_b_data = 0;
     
-    m_via.set_port_a_callback([this](u8 data) {
-        // Extract Control Lines (Lower 3 bits)
-        bool rs = (data & 0x20); // Bit 5
-        bool rw = (data & 0x40); // Bit 6
-        bool e  = (data & 0x80); // Bit 7
-        
-        // The LCD executes on the FALLING EDGE of Enable (High -> Low).
-        if (m_last_e_state && !e) {
-            // Trigger the 8-bit write!
-            // We send the data sitting on Port B, using the flags from Port A.
+    // 2. Re-Install Memory Map
+    // We create a new map and force the CPU to use it.
+    // (Note: In a real MAME system, the manager handles this rebuild.
+    //  Here, we just re-run the map setup logic).
+    static address_map active_map;
+    map_setup(active_map);
+    m_cpu->install_map(&active_map);
 
-            m_lcd.write_8bit(m_port_b_data, rs, rw);
-            //m_lcd.write_4bit(m_port_b_data, rs, rw, e);
-        }
-        m_last_e_state = e; // Store for next time
-    });
-
-    // U5 Port A is UNUSED (Schematic check: No connections to LCD)
-    // m_via.set_port_a_callback(...) -> Removed.
-
-    // ========================================================================
-    // 4. WIRE INTERRUPTS
-    // ========================================================================
-    // Combine VIA and ACIA IRQs (Wire-OR logic).
+    // 3. Re-Wire Interrupts & I/O based on Schematic
+    
+    // --- COMMON INTERRUPT LOGIC ---
     auto irq_handler = [this](bool state) {
-        // Check if VIA OR ACIA is pulling IRQ low (Active Low)
-        // Since set_input_line expects a boolean state (true/false),
-        // we just pass the incoming state. 
-        // In a real wire-or, we'd check if (via_irq || acia_irq).
         m_cpu->set_input_line(m6502_p::IRQ_LINE, state ? 1 : 0);
     };
-
     m_via.set_irq_callback(irq_handler);
     m_acia.set_irq_callback(irq_handler);
 
-    m_cpu->device_start();
+
+    // --- SCHEMATIC SPECIFIC WIRING ---
+    if (m_current_type == MachineType::SCHEMATIC_1_BASIC) {
+        std::cout << "[Board] Configured for Schematic 1 (Basic)" << std::endl;
+        
+        // SCHEMATIC 1: LCD on Port B (Data) + Port A (Control)
+        // PB0-7 = Data Bus
+        // PA5=RS, PA6=RW, PA7=E
+        
+        m_via.set_port_b_callback([this](u8 data) {
+            m_port_b_data = data;
+        });
+        
+        m_via.set_port_a_callback([this](u8 data) {
+            bool rs = (data & 0x20); // Bit 5
+            bool rw = (data & 0x40); // Bit 6
+            bool e  = (data & 0x80); // Bit 7
+            
+            if (m_last_e_state && !e) { // Falling Edge
+                // 8-bit write using Port B data
+                m_lcd.write_8bit(m_port_b_data, rs, rw);
+            }
+            m_last_e_state = e;
+        });
+    }
+    else if (m_current_type == MachineType::SCHEMATIC_2_SERIAL) {
+        std::cout << "[Board] Configured for Schematic 2 (Serial)" << std::endl;
+        
+        // SCHEMATIC 2: 
+        // (You will implement the specific wiring here later based on the 2nd schematic image)
+        // For now, leave it blank or default to Basic behavior.
+    }
+
+    // 4. Clear Lines
+    m_cpu->set_input_line(m6502_p::IRQ_LINE, 0); 
+    m_cpu->set_input_line(m6502_p::NMI_LINE, 0);
 }
 
 void mb_driver::reset() {
@@ -138,19 +145,11 @@ void mb_driver::run(int cycles) {
     // Give the CPU a budget of cycles
     m_cpu->icount_set(cycles);
 
+    m_via.clock();
+
     // Run the CPU
     m_cpu->execute_run();
 
-    // Check how many cycles are LEFT
-    int cycles_left = m_cpu->icount_get();
-
-    // For Debug purposes
-    /*printf("PC: %04X | SP: %02X | Opcode: %02X | Requested: %d | Left: %d\n", 
-            m_cpu->get_pc(),
-            m_cpu->get_sp(),
-            m_cpu->debug_peek(m_cpu->get_pc()),
-            cycles,
-            cycles_left);*/
 }
 
 // ============================================================================
@@ -158,28 +157,40 @@ void mb_driver::run(int cycles) {
 // ============================================================================
 void mb_driver::map_setup(address_map& map) {
     
-    // --- Read Logic ---
-    auto read_logic = [this](u16 addr) -> u8 {
-        // 1. ROM (U2): Enabled when A15=1 ($8000-$FFFF)
-        if (addr >= 0x8000) return m_rom.read(addr);
+     auto read_logic = [this](u16 addr) -> u8 {
+        // Common ROM
+        if (addr >= 0x8000) return m_rom.read(addr - 0x8000);
+        
+        // I/O Mapping Changes based on Schematic!
+        if (m_current_type == MachineType::SCHEMATIC_1_BASIC) {
+            // Basic: VIA at $6000
+            if (addr >= 0x6000 && addr <= 0x7FFF) return m_via.read(addr - 0x6000);
+        }
+        else {
+            // Serial: ACIA usually at $5000, VIA at $6000
+            if (addr >= 0x6000 && addr <= 0x7FFF) return m_via.read(addr - 0x6000);
+            if (addr >= 0x4000 && addr <= 0x5FFF) return m_acia.read(addr - 0x4000); 
+        }
 
-        // 2. VIA (U5): Enabled when A14=1 (and A15=0) ($6000-$7FFF)
-        if (addr >= 0x6000) return m_via.read(addr);
-
-        // 3. ACIA (U7): Enabled when A13=1? ($5000)
-        // Standard Ben Eater map places ACIA at $5000 or overlapping $4000 range.
-        if (addr >= 0x4000) return m_acia.read(addr);
-
-        // 4. RAM (U6): Enabled when A14=0, A15=0 ($0000-$3FFF)
-        return m_ram.read(addr);
+        // Common RAM
+        if (addr < 0x4000) return m_ram.read(addr);
+        
+        return 0xEA; // Open Bus
     };
 
-    // --- Write Logic ---
     auto write_logic = [this](u16 addr, u8 data) {
-        if (addr >= 0x8000)      m_rom.write(addr -  0x8000, data);
-        else if (addr >= 0x6000) m_via.write(addr - 0x6000, data);
-        else if (addr >= 0x4000) m_acia.write(addr - 0x4000, data);
-        else                     m_ram.write(addr, data);
+        if (addr >= 0x8000)      m_rom.write(addr - 0x8000, data);
+        else if (addr < 0x4000)  m_ram.write(addr, data);
+        else {
+            // I/O Write Logic
+            if (m_current_type == MachineType::SCHEMATIC_1_BASIC) {
+                if (addr >= 0x6000) m_via.write(addr - 0x6000, data);
+            }
+            else {
+                if (addr >= 0x6000) m_via.write(addr - 0x6000, data);
+                else if (addr >= 0x4000) m_acia.write(addr - 0x4000, data);
+            }
+        }
     };
 
     map.install(0x0000, 0xFFFF, read_logic, write_logic);
@@ -187,8 +198,13 @@ void mb_driver::map_setup(address_map& map) {
     // Debug Handler (Safe Access)
     map.install_debug_handler(0x0000, 0xFFFF, [this](u16 addr) -> u8 {
         if (addr >= 0x8000) return m_rom.read(addr - 0x8000);
-        if (addr >= 0x6000) return m_via.peek(addr - 0x6000);
-        if (addr >= 0x4000) return m_acia.read(addr - 0x4000); // ACIA reads side-effect free usually
-        return m_ram.read(addr);
+        if (addr < 0x4000)  return m_ram.read(addr);
+        
+        // I/O Debug
+        if (addr >= 0x6000 && addr <= 0x7FFF) return m_via.peek(addr - 0x6000);
+        if (m_current_type == MachineType::SCHEMATIC_2_SERIAL) {
+            if (addr >= 0x4000 && addr <= 0x5FFF) return m_acia.read(addr - 0x4000);
+        }
+        return 0x00;
     });
 }
