@@ -1,35 +1,17 @@
 # 6502-Emulator
 
-![RUNNING Version of the Emulator in 8-Bit](6502/Debug_output_window_running.png)
-
-This is a Emulator based on Ben Eaters 6502 computer and first schematic without the Serial interface, I have started the modeling for that interface.
-
-![Ben Eater First Schematic 6502 Computer](6502/6502_First-Schematic.png)
-
-
-
-Ben's Schematic with the Serial Interface 
-![Ben Eater Schematic 6502 Computer](6502/6502_eater_schematic1.png)
-
 A cycle-accurate, component-level emulator of the Ben Eater 6502 breadboard computer. This project simulates the hardware behavior of the W65C02S CPU, W65C22 VIA, and NHD-0216K1Z LCD (in 4-bit mode), wrapped in a modern graphical debugger built with Dear ImGui.
 
 (Emulator running "Hello, world!" with blinking block cursor)
 
-📖 Table of Contents
-
-About The Project
-
-Hardware Architecture
-
-Directory Structure
-
-Features
-
-Getting Started
-
-Usage
-
-Media Gallery
+## 📖 Table of Contents
+- [About The Project](#about-the-project)
+- [Hardware Architecture](#hardware-architecture)
+- [Directory Structure](#directory-structure)
+- [Features](#features)
+- [Getting Started](#getting-started)
+- [Usage](#usage)
+- [Media Gallery](#media-gallery)
 
 🛠 About The Project
 
@@ -146,6 +128,7 @@ Prerequisites
 * **Make** (or CMake if configured).
 
 * **Libraries:**
+    * **asio**
 
     * **SDL2**
 
@@ -185,18 +168,15 @@ make
 
 **CPU & Stack Inspector**
 
-Real-time view of the processor internals and stack frames.
-(CPU State and Stack Visualization)
+![RUNNING Version of the Emulator in 8-Bit](6502/Debug_output_pixel-perfect.png)
 
-Memory Hex Dump
+This is a Emulator based on Ben Eaters 6502 computer and first schematic without the Serial interface, I have started the modeling for that interface.
 
-Live inspection of system RAM and Memory Mapped I/O.
-(Hex Dump showing ACIA/VIA registers)
+![Ben Eater First Schematic 6502 Computer](6502/6502_First-Schematic.png)
 
-LCD "Hello World" Output
 
-Demonstration of the 4-bit interface driving the display.
-(The "Hello, world!" output)
+Ben's Schematic with the Serial Interface 
+![Ben Eater Schematic 6502 Computer](6502/6502_eater_schematic1.png)
 
 License
 
