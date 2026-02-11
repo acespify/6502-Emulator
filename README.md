@@ -148,10 +148,10 @@ cd 6502-emulator
 Before running the emulator, you must generate the firmware.
 
 # Compile and run the generator
-g++ tools/rom_generator.cpp -o rom_gen
-./rom_gen
-# This creates 'rom.bin' in the root directory
+python tools\rom_build.py
 
+# This creates 'rom.bin' in the root directory
+rom.bin
 
 3. **Build the Emulator**
 
