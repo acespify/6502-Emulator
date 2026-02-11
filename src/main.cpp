@@ -4,6 +4,7 @@
 #include <chrono>
 #include <thread>
 
+
 // UI Includes
 #include "ui/renderer.h"
 #include "ui/views/debug_view.h"
@@ -39,7 +40,8 @@ int main(int argc, char* argv[]) {
 
     // Timing Variables
     // Target: 60FPS (16.66ms per frame)
-    const auto target_frame_duration = std::chrono::microseconds(16667);
+    const int UI_FPS = 60;
+    const auto ui_frame_duration = std::chrono::microseconds(1000000 / UI_FPS);
 
     // 4. Main Loop
     while (!renderer.should_close()) {
@@ -47,13 +49,34 @@ int main(int argc, char* argv[]) {
 
         renderer.begin_frame();
 
+        // 1. Get Target Speed from UI
+        int target_hz = debugger.get_target_hz();
+        
+        // 2. Calculate cycles per frame
+        // If 1MHz at 60FPS -> 16666 cycles/frame
+        // If 10Hz  at 60FPS -> 0.16 cycles/frame (Accumulate fractions!)
+        
+        static float cycle_accumulator = 0.0f;
+        float cycles_per_frame = (float)target_hz / (float)UI_FPS;
+
         // CPU Execution Logic
         if (!is_paused || step_req) {
-            // Speed: 1MHz = 1,000,000 cycles / 60 FPS = ~16667 cycles per frame
-            int cycles = step_req ? 1 : 16667;
             
-            computer.run(cycles);
+            // Handle slow speeds (< 60Hz) by accumulating partial cycles
+            cycle_accumulator += cycles_per_frame;
             
+            int cycles_to_run = (int)cycle_accumulator;
+            
+            if (step_req) {
+                cycles_to_run = 1; // Step overrides speed
+                cycle_accumulator = 0;
+            }
+
+            if (cycles_to_run > 0) {
+                computer.run(cycles_to_run);
+                cycle_accumulator -= cycles_to_run; // Keep remainder
+            }
+
             step_req = false;
         }
 
@@ -68,8 +91,8 @@ int main(int argc, char* argv[]) {
         auto frame_end = std::chrono::steady_clock::now();
         auto elapsed = frame_end - frame_start;
 
-        if (elapsed < target_frame_duration) {
-            std::this_thread::sleep_for(target_frame_duration - elapsed);
+        if (elapsed < ui_frame_duration) {
+            std::this_thread::sleep_for(ui_frame_duration - elapsed);
         }
     }
 

@@ -1,11 +1,12 @@
 # Ignore the larger schematic file
 6502_eater_schematic.png
 
-# Ignore build folder and .vscode file And Vendor folder
-vendor
+# Ignore build folder and .vscode file
 .vscode/
 build/
 
+
 # Ignore rom-generator and rom.bin
-rom_generator.exe
-rom.bin
+*.exe
+*.bin
+*.ods

@@ -40,12 +40,11 @@ public:
     // System Reset (RESB pin)
     void reset();
 
+    // Cycle steppign (Needed for Timers!)
+    void clock();
+
     // Debugger Helper: Read without side effects
-    u8 peek(u16 addr) const {
-        // just return the raw register value
-        // No "Clear Interrupt" logic here.
-        return m_regs[addr & 0x0F];
-    }
+    u8 peek(u16 addr) const { return m_regs[addr & 0x0F]; }
 
     // --- PORT INTERFACE ---
     // These functions simulate the physical pins on the side of the chip.
@@ -68,11 +67,6 @@ public:
 
     // Required by device interface
     void memory_map(address_map& map) override;
-
-    
-    
-
-    
 
 private:
     // ========================================================================
@@ -101,6 +95,16 @@ private:
     // Output Latches (Data sent TO the outside world)
     u8 m_out_a;
     u8 m_out_b;
+
+    // --- TIMERS ---
+    u16 m_t1_counter;
+    u16 m_t1_latch;
+    bool m_t1_active;
+    
+    u16 m_t2_counter;
+    u16 m_t2_latch;
+    bool m_t2_active;
+    bool m_t2_pb6_pulse; // T2 can pulse PB6
 
     // The stored callback function
     irq_callback m_irq_cb;

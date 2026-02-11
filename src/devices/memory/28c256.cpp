@@ -41,7 +41,7 @@ bool eeprom_28c256::load_from_file(const std::string& filename) {
     return true;*/
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
-        printf("[ROM] Error: Failed to open %s\n", filename); // Debug print
+        std::cout << "[ROM] Error: Failed to open %s\n" << filename << std::endl; // Debug print
         return false;
     }
 
@@ -52,7 +52,7 @@ bool eeprom_28c256::load_from_file(const std::string& filename) {
     if (size > 32768) size = 32768;
 
     if (file.read((char*)m_data, size)) {
-        printf("[ROM] Loaded %lld bytes from %s\n", size, filename); // Debug print
+       std::cout << "[ROM] Loaded %lld" << size << " bytes from %s\n" << filename << std::endl; // Debug print
         return true;
     }
     return false;
