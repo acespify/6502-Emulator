@@ -28,6 +28,13 @@ public:
     bool is_display_on()   const { return m_display_on; }
     bool is_8bit_mode()    const { return m_8bit_mode; }
 
+    // Getters for raw memory access for the pixel-perfect renderer
+    const u8* get_ddram() const { return m_ddram; }
+    const u8* get_cgram() const { return m_cgram; }
+
+    // CGROM DATA: 256 characters, each 8 bytes high ( only lower 5 bits used)
+    static const u8 CGROM_A00[256][8];
+
 private:
     // Internal Memory
     u8 m_ddram[0x80];       // Display Data RAM

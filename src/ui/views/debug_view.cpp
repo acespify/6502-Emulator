@@ -3,6 +3,8 @@
 #include "../../devices/video/nhd_0216k1z.h" // Required for m_lcd->get_display_lines()
 #include "../../../vendor/imgui/imgui.h"
 #include <cstdio>
+#include <cmath>
+
 // We need the CPU definition to access registers (A, X, Y, PC)
 // Ensure this path matches where you put your CPU file
 #include "devices/cpu/m6502.h" 
@@ -44,6 +46,7 @@ void DebugView::draw(bool& is_paused, bool& step_request) {
     if (m_show_ram)     draw_memory_window();
     if (m_show_lcd)     draw_lcd_window();
     if (m_show_rom)     draw_rom_window();
+    if (m_show_speed)   draw_speed_control();
 }
 
 // ============================================================================
@@ -78,6 +81,7 @@ void DebugView::draw_menu_bar(bool& is_paused, bool& step_request) {
             ImGui::MenuItem("Memory Dump",   nullptr, &m_show_ram);
             ImGui::MenuItem("Rom",           nullptr, &m_show_rom);
             ImGui::MenuItem("LCD Display",   nullptr, &m_show_lcd);
+            ImGui::MenuItem("Speed Control", nullptr, &m_show_speed);
             ImGui::EndMenu();
         }
 
@@ -173,8 +177,35 @@ void DebugView::draw_cpu_window(bool& is_paused, bool& step_request) {
              if (ImGui::Button("Step")) step_request = true;
              ImGui::SameLine();
              if (ImGui::Button("Run")) is_paused = false;
+             ImGui::SameLine();
+             if (ImGui::Button("Reset")) {
+                if (m_cpu) m_cpu->device_reset();
+             }
         } else {
              if (ImGui::Button("Pause")) is_paused = true;
+        }
+
+        ImGui::Separator();
+        ImGui::Text("Hardware Configuration");
+
+        // 1. Get Current Type
+        MachineType current = m_driver->get_machine_type();
+        int current_idx = (int)current;
+        
+        // 2. Define Names
+        const char* items[] = { "Schematic 1 (Basic)", "Schematic 2 (Serial)" };
+        
+        // 3. Draw Combo Box
+        if (ImGui::Combo("Motherboard", &current_idx, items, IM_ARRAYSIZE(items))) {
+            // 4. If changed, apply new hardware
+            m_driver->set_machine_type((MachineType)current_idx);
+            
+            // Force pause so we don't crash running old code on new hardware
+            is_paused = true; 
+        }
+        
+        if (current_idx == 1) {
+            ImGui::TextColored(ImVec4(1,1,0,1), "Note: Requires ROM with Serial support!");
         }
 
     } else {
@@ -422,76 +453,109 @@ void DebugView::draw_memory_window() {
 //  2. LCD Window (Visualizing U3)
 // ============================================================================
 void DebugView::draw_lcd_window() {
-    ImGui::Begin("LCD Display (U3)");
+    ImGui::Begin("LCD Display (U3) - Pixel Perfect");
 
-    // 1. Set Retro Colors (Yellow-Green Background, Dark Grey Text)
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.60f, 0.80f, 0.20f, 1.0f)); // #99CC33
-    ImGui::PushStyleColor(ImGuiCol_Text,    ImVec4(0.10f, 0.15f, 0.05f, 1.0f)); // Dark Green/Grey
+    // Setup Canvas
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImVec2 startPos = ImGui::GetCursorScreenPos();
 
-    // 2. Create the LCD Screen Box
-    ImGui::BeginChild("Screen", ImVec2(0, 80), true); // 80px height
-    
-    // Set Font Scale (Make it look blocky/retro if possible)
-    ImGui::SetWindowFontScale(2.0f);
+    // Pixel Tuning Parameters
+    float pixelSize = 3.0f;     // Size of each LCD "dot"
+    float pixelGap  = 1.0f;     // Space between dots
+    float charGap   = 4.0f;     // Space between 5x8 characters
 
-    const auto& lines = m_lcd->get_display_lines();
-    u8 cursor_addr = m_lcd->get_cursor_addr();
-    bool cursor_vis = m_lcd->is_cursor_on();
+    // LCD Colors (Datasheet-accurate)
+    ImU32 colorBg    = IM_COL32(153, 204, 51, 255);  // Yellow-Green background
+    ImU32 colorPixel = IM_COL32(30, 40, 10, 255);    // Lit pixel (Dark)
+    ImU32 colorDim   = IM_COL32(140, 190, 45, 100);  // Unlit pixel (Slightly darker than BG)
 
-    // Loop through 2 lines
+    // 3. Draw the LCD Background Panel
+    float totalW = (16 * (5 * (pixelSize + pixelGap) + charGap));
+    float totalH = (2 * (8 * (pixelSize + pixelGap) + charGap));
+    drawList->AddRectFilled(startPos, ImVec2(startPos.x + totalW, startPos.y + totalH), colorBg);
+
+    // 4. Render 2 Rows of 16 Characters
     for (int row = 0; row < 2; row++) {
-        // Construct the line string
-        std::string line_text = lines[row];
-        
-        // Print the line
-        ImGui::Text("%s", line_text.c_str());
+        for (int col = 0; col < 16; col++) {
+            
+            // Get DDRAM address and character code
+            uint8_t addr = (row == 0) ? (0x00 + col) : (0x40 + col);
+            uint8_t charCode = m_lcd->get_ddram()[addr];
+            uint8_t cursorAC = m_lcd->get_cursor_addr();
 
-        // --- DRAW CURSOR MANUALLY ---
-        if (cursor_vis) {
-            int cursor_row = (cursor_addr >= 0x40) ? 1 : 0;
-            int cursor_col = (cursor_addr & 0x0F);
+            // Fetch bit pattern (Check if CGRAM or CGROM)
+            const uint8_t* pattern;
+            if (charCode < 0x08) {
+                pattern = &m_lcd->get_cgram()[charCode * 8]; // User custom char
+            } else {
+                pattern = nhd_0216k1z::CGROM_A00[charCode];   // Standard ROM char
+            }
 
-            if (row == cursor_row && cursor_col < 16) {
-                // Get position of the start of the text line
-                ImVec2 line_pos = ImGui::GetItemRectMin();
+            // Draw the 5x8 Matrix for this character
+            for (int y = 0; y < 8; y++) {
+                uint8_t rowBits = pattern[y];
+
+                // Handle Cursor Logic (Blinking or Underscore)
+                bool isCursorPos = (addr == cursorAC);
+                bool blinkOn = m_lcd->is_blink_on() && ((int)(ImGui::GetTime() * 2.0f) % 2 == 0);
                 
-                // Approximate character size (Monospace font is best for this)
-                float char_w = ImGui::GetFontSize() * 0.5f; 
-                float char_h = ImGui::GetFontSize();
+                for (int x = 0; x < 5; x++) {
+                    // Check if pixel is lit (Bit 4 is the leftmost dot)
+                    bool bitLit = (rowBits >> (4 - x)) & 0x01;
+                    
+                    // Logic for Cursor: OR with the character pattern
+                    if (isCursorPos && m_lcd->is_cursor_on()) {
+                        if (m_lcd->is_blink_on()) {
+                            if (blinkOn) bitLit = true; // Full block blink
+                        } else if (y == 7) {
+                            bitLit = true; // Underscore on 8th line [cite: 19, 26]
+                        }
+                    }
 
-                // Calculate exact screen coordinates for the cursor
-                ImVec2 cursor_screen_pos = ImVec2(
-                    line_pos.x + (cursor_col * char_w), 
-                    line_pos.y
-                );
+                    // Calculate screen position for this specific dot
+                    ImVec2 p1 = {
+                        startPos.x + (col * (5 * (pixelSize + pixelGap) + charGap)) + (x * (pixelSize + pixelGap)),
+                        startPos.y + (row * (8 * (pixelSize + pixelGap) + charGap)) + (y * (pixelSize + pixelGap))
+                    };
+                    ImVec2 p2 = { p1.x + pixelSize, p1.y + pixelSize };
 
-                // Draw Blinking Block
-                // Blink rate: Every 0.5 seconds
-                bool blink_state = (ImGui::GetTime() - (int)ImGui::GetTime()) > 0.5f;
-                
-                if (m_lcd->is_blink_on() && blink_state) {
-                    ImGui::GetWindowDrawList()->AddRectFilled(
-                        cursor_screen_pos,
-                        ImVec2(cursor_screen_pos.x + char_w, cursor_screen_pos.y + char_h),
-                        IM_COL32(20, 40, 10, 255) // Dark Green Block
-                    );
-                }
-                // If blink is off but cursor is on, draw underscore (optional)
-                else if (!m_lcd->is_blink_on()) {
-                     ImGui::GetWindowDrawList()->AddRectFilled(
-                        ImVec2(cursor_screen_pos.x, cursor_screen_pos.y + char_h - 2),
-                        ImVec2(cursor_screen_pos.x + char_w, cursor_screen_pos.y + char_h),
-                        IM_COL32(20, 40, 10, 255)
-                    );
+                    drawList->AddRectFilled(p1, p2, bitLit ? colorPixel : colorDim);
                 }
             }
         }
     }
 
-    ImGui::EndChild();
-    ImGui::PopStyleColor(2); // Restore Colors
+    // Move ImGui cursor past the drawing area so other UI elements don't overlap
+    ImGui::Dummy(ImVec2(totalW, totalH));
+    ImGui::End();
+}
 
-    ImGui::TextDisabled("Controller: ST7066U (8-Bit Mode)");
+void DebugView::draw_speed_control() {
+    ImGui::Begin("Clock Control");
+
+    ImGui::Text("Target Speed:");
+    
+    // Logarithmic slider feels better for speed (1Hz to 1MHz)
+    // We use a float for the slider, then cast to int
+    static float speed_log = 6.0f; // 10^6 = 1MHz
+    
+    if (ImGui::SliderFloat("##speed", &speed_log, 0.0f, 6.0f, "10^%.1f Hz")) {
+        // Convert Log10 back to Integer Hz
+        // 0.0 -> 1 Hz
+        // 6.0 -> 1,000,000 Hz
+        m_target_hz = (int)pow(10.0f, speed_log);
+    }
+
+     
+    // Quick Presets
+    if (ImGui::Button("1 Hz"))    { m_target_hz = 1;       speed_log = 0.0f; } ImGui::SameLine();
+    if (ImGui::Button("10 Hz"))   { m_target_hz = 10;      speed_log = 1.0f; } ImGui::SameLine();
+    if (ImGui::Button("1 kHz"))   { m_target_hz = 1000;    speed_log = 3.0f; } ImGui::SameLine();
+    if (ImGui::Button("1 MHz"))   { m_target_hz = 1000000; speed_log = 6.0f; }
+
+    ImGui::Separator();
+    ImGui::Text("Current Target: %d Hz", m_target_hz);
+
     ImGui::End();
 }
 
