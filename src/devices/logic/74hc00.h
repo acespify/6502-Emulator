@@ -1,5 +1,5 @@
 #pragma once
-#include "../../types.h"
+#include "../../emu/types.h"
 
 // ============================================================================
 //  Device: 74HC00 (Quad 2-Input NAND Gate)
