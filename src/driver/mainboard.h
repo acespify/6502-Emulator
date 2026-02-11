@@ -6,6 +6,15 @@
 #include "../devices/io/w65c22.h"
 #include "../devices/io/w65c51.h"
 #include "../devices/video/nhd_0216k1z.h"
+#include "../devices/logic/74hc00.h"
+
+// ============================================================================
+// Hardware variants
+// ============================================================================
+enum class MachineType {
+    SCHEMATIC_1_BASIC,  // LCD ON PORT B (8-BIT), NO Serial
+    SCHEMATIC_2_SERIAL  // LCD
+};
 
 // ============================================================================
 //  Driver: Ben Eater 6502 Computer
@@ -19,6 +28,10 @@ public:
     void reset() override;
     void run(int cycles) override;
 
+    // Method to switch Hardware
+    void set_machine_type(MachineType type);
+    MachineType get_machine_type() const { return m_current_type; }
+
     // Expose components for UI
     m6502_p* get_cpu() override;
     w65c22* get_via() override { return &m_via; }
@@ -30,6 +43,8 @@ public:
     }
 
 private:
+    MachineType m_current_type = MachineType::SCHEMATIC_1_BASIC;
+
     // --- The Chips ---
     // We use a custom CPU subclass internally to bind the map
     class board_cpu; 
