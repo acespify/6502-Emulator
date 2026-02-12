@@ -1,10 +1,10 @@
 # 6502-Emulator
 
-A cycle-accurate, component-level emulator of the Ben Eater 6502 breadboard computer. This project simulates the hardware behavior of the W65C02S CPU, W65C22 VIA, and NHD-0216K1Z LCD (in 4-bit mode), wrapped in a modern graphical debugger built with Dear ImGui.
+A cycle-accurate, component-level emulator of the Ben Eater 6502 breadboard computer. This project simulates the hardware behavior of the W65C02S CPU, W65C22 VIA, and NHD-0216K1Z LCD (in 8-bit mode), wrapped in a modern graphical debugger built with Dear ImGui.
 
 (Emulator running "Hello, world!" with blinking block cursor)
 
-## 📖 Table of Contents
+##  Table of Contents
 - [About The Project](#about-the-project)
 - [Hardware Architecture](#hardware-architecture)
 - [Directory Structure](#directory-structure)
@@ -13,7 +13,7 @@ A cycle-accurate, component-level emulator of the Ben Eater 6502 breadboard comp
 - [Usage](#usage)
 - [Media Gallery](#media-gallery)
 
-🛠 About The Project
+ About The Project
 
 This emulator goes beyond simple instruction simulation. It models the physical interconnects of the breadboard computer, including address decoding logic, memory mapping, and peripheral interface adapters.
 
@@ -25,7 +25,7 @@ LCD Controller State Machine: The ST7066U controller is emulated in detail, incl
 
 ROM Generation: Includes a custom C++ based assembler/generator to create binary ROM images directly from code.
 
-⚡ Hardware Architecture
+ Hardware Architecture
 
 The emulator replicates the following schematic:
 
@@ -44,7 +44,7 @@ Emulated Components
 
 
 
-📂 **Directory Structure**
+ **Directory Structure**
 
 The project is organized by hardware device types, drivers, and UI components.
 
@@ -76,9 +76,9 @@ The project is organized by hardware device types, drivers, and UI components.
 │   ├── emu/                   # Emulation Framework (Base classes)
 │   │   ├── device.h
 │   │   ├── di_execute.h
-│   │   ├── di_memory.h
-│   │   ├── machine.h
-│   │   ├── map.h
+│   │   ├── di_memory.h        
+│   │   ├── machine.h          # Base class for the machine
+│   │   ├── map.h              # Address Mapping
 │   │   └── types.h
 │   ├── ui/                    # Graphical User Interface
 │   │   ├── views/
@@ -88,14 +88,14 @@ The project is organized by hardware device types, drivers, and UI components.
 │   │   └── renderer.h
 │   └── main.cpp               # Entry Point
 ├── tools/
-│   └── rom_generator.cpp      # C++ Assembly Tool for Firmware
+│   └── rom_build.py           # C++ Assembly Tool for Firmware
 ├── vendor/                    # Third-party libraries (ImGui, GLFW, etc.)
 └── Makefile                   # Build Configuration
 ```
 
-✨ Features
+ Features
 
-🖥️ Accurate LCD Emulation
+ Accurate LCD Emulation
 
 Unlike generic text outputs, this emulator simulates the ST7066U controller.
 
@@ -107,7 +107,7 @@ Full Command Set: Supports Clear, Home, Entry Mode, and custom cursor behavior (
 
 CGROM Mapping: Correctly maps special ROM codes (like 0x7E → →) to UTF-8 for display.
 
-🐛 Visual Debugger
+ Visual Debugger
 
 Real-time CPU State: View A, X, Y registers, Stack Pointer, and Status Flags (NV-BDIZC).
 
@@ -115,11 +115,11 @@ Stack Visualizer: Inspect the stack memory page ($0100 - $01FF) in real-time.
 
 Execution Control: Step-by-step execution or full-speed running (locked to 1MHz).
 
-🛠️ Integrated ROM Generator
+ Integrated ROM Generator
 
 Includes a rom_generator tool that allows you to write "Assembly-in-C++". It compiles directly to a rom.bin file, handling label resolution and opcode emission automatically.
 
-🚀 Getting Started
+ Getting Started
 
 Prerequisites
 
@@ -163,8 +163,7 @@ make
 
 ./build/eater.exe
 
-
-📸 Media Gallery
+ Media Gallery
 
 **CPU & Stack Inspector**
 
