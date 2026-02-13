@@ -349,17 +349,41 @@ void m6502_p::execute_run() {
 //  Interrupts
 // ============================================================================
 void m6502_p::irq() {
+    // Saving the program counter
+    // The cpu must know where to return after teh interrupt is finished.
+    // Here we push the 16-bit program counter to the stack (High-byte, then low-byte)
     push_word(PC);
-    set_flag(B, 0); set_flag(U, 1); set_flag(I, 1);
-    push_byte(P);
+
+    // Flag manipulation
+    // B Flag (break): Must be 0 for IRQ's.
+    // U Flag (unused): This is always set to 1
+    set_flag(B, 0); set_flag(U, 1);
     
+    // Save the status Register (P)
+    // This will save the state of the flags 
+    // so they can be restored exactly as they were previously.
+    push_byte(P);
+
+    // This was originally place above the push_byte(P) Flag
+    // which is a bug, moved to after the push so that the interrupt disable
+    // does not affect the flags. 
+    set_flag(I, 1);
+
+    // Fetch the Interrupt Vector
+    // The 6502 has a "hardcoded" address where it looks for the IRQ handler.
+    // It reads the 16-bit address stored at 0xFFFE (Low) and 0xFFFF (High).The 6502 has a "hardcoded" address where it looks for the IRQ handler.
     u16 lo = read_byte(0xFFFE);
     u16 hi = read_byte(0xFFFF);
+
+    // Jump to the handler
+    // Set the program counter to the address we just read
     PC = (hi << 8) | lo;
     
-    m_cycles = 7;
-    m_icount -= 7;
-    m_total_cycles += 7;
+    // Accounting for the time
+    // An IRQ sequenct always takes exactly 7 clock cycles.
+    m_cycles = 7;               // This instruction too 7 cycles
+    m_icount -= 7;              // Subtract from the remaining time slice
+    m_total_cycles += 7;        // Add to total system uptime
 }
 
 void m6502_p::nmi() {
