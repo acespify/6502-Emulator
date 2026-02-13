@@ -13,6 +13,9 @@
 // Ensure this path matches where you put your CPU file
 #include "devices/cpu/m6502.h" 
 
+bool DebugView::m_enable_trace = false;
+bool DebugView::m_en_cpu_trace = false;
+
 std::vector<LogEntry> DebugView::m_logs;
 
 void DebugView::add_log(LogType type, const char* fmt, ...){
@@ -710,7 +713,11 @@ void DebugView::draw_log_window() {
         if(ImGui::Button("Clear")) m_logs.clear();
         ImGui::SameLine();
         if (ImGui::Button("Copy to Clipboard")) { /* ... */}
-
+        ImGui::SameLine();
+        // To enable tracing
+        ImGui::Checkbox("Enable Trace", &DebugView::m_enable_trace);
+        ImGui::SameLine();
+        ImGui::Checkbox("Enable CPU Trace", &DebugView::m_en_cpu_trace);
         ImGui::Separator();
 
         ImGui::BeginChild("ScrollingRegion", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);

@@ -38,6 +38,8 @@ public:
     int get_target_hz() const { return m_target_hz;}
 
     static void add_log(LogType type, const char* fmt, ...);
+    static bool m_enable_trace; // Static boolean to toggle from the UI
+    static bool m_en_cpu_trace;
 private:
     // ----- Hardware Pointers -----
     mb_driver* m_driver;
@@ -88,6 +90,8 @@ private:
     void draw_lcd_window();
     void draw_rom_window();
     void draw_speed_control();
+
+    // Log window for viewing data
     void draw_log_window();
 };
 
