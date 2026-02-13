@@ -1,4 +1,5 @@
-#include "devices/cpu/m6502.h"
+#include "m6502.h"
+#include "ui/views/debug_view.h"
 #include <iostream>
 
 // ============================================================================
@@ -288,7 +289,9 @@ void m6502_p::set_input_line(int line, bool state) {
     }
 }
 
-void m6502_p::memory_map(address_map &map) { }
+void m6502_p::memory_map(address_map &map) { 
+    (void)map;
+}
 
 // ============================================================================
 //  Execute Cycle
@@ -325,6 +328,12 @@ void m6502_p::execute_run() {
         // Execute Instruction
         m_cycles = 0;
         opcode = read_byte(PC++);
+
+        // We log the Program Counter (PC-1 because it was just incremented) 
+        // and the hex value of the opcode.
+        //if (m_is_stepping || m_is_paused) {
+        //    DebugView::add_log(LOG_CPU, "[$%04X] EXEC: %02X", (PC - 1), opcode);
+        //}
         
         m_cycles = lookup[opcode].cycles;
         u8 extra1 = (this->*lookup[opcode].addrmode)();

@@ -1,8 +1,11 @@
 #include "28c256.h"
 #include "../../emu/map.h"
-#include <cstdio>  // For fopen, fread
+#include <iostream>  // For fopen, fread
 #include <cstring> // For memset
 #include <fstream>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 // ============================================================================
 //  Constructor
@@ -30,31 +33,43 @@ void eeprom_28c256::reset_memory() {
 //  HOW:  Uses standard C file I/O for simplicity and speed.
 // ============================================================================
 bool eeprom_28c256::load_from_file(const std::string& filename) {
-    /*FILE* f = fopen(filename.c_str(), "rb");
-    if (!f) return false;
-
-    // Read up to 32K bytes.
-    // If the file is smaller, the rest remains 0xFF.
-    // If larger, we truncate.
-    fread(m_data, 1, 32768, f);
-    fclose(f);
-    return true;*/
+     // 1. Try opening exactly as passed
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
+    
     if (!file.is_open()) {
-        std::cout << "[ROM] Error: Failed to open %s\n" << filename << std::endl; // Debug print
+        // 2. If failed, check if we are in 'bin/' or 'build/' and file is in root
+        if (fs::exists("../" + filename)) {
+            std::cout << "[ROM] Found file in parent directory. Trying ../" << filename << std::endl;
+            file.open("../" + filename, std::ios::binary | std::ios::ate);
+        }
+    }
+
+    if (!file.is_open()) {
+        // 3. One last check: maybe it's in a 'roms/' folder?
+        if (fs::exists("roms/" + filename)) {
+            file.open("roms/" + filename, std::ios::binary | std::ios::ate);
+        }
+    }
+
+    if (!file.is_open()) {
+        std::cerr << "[ROM] Error: Could not open " << filename << " (Checked CWD, ../, and roms/)" << std::endl;
         return false;
     }
 
     std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
 
-    // Safety: Don't overflow the 32KB buffer
-    if (size > 32768) size = 32768;
+    if (size > 32768) {
+        std::cerr << "[ROM] Warning: File size (" << size << ") larger than 32KB. Truncating." << std::endl;
+        size = 32768;
+    }
 
     if (file.read((char*)m_data, size)) {
-       std::cout << "[ROM] Loaded %lld" << size << " bytes from %s\n" << filename << std::endl; // Debug print
+        std::cout << "[ROM] Successfully loaded " << size << " bytes." << std::endl;
         return true;
     }
+
+    std::cerr << "[ROM] Error reading file data." << std::endl;
     return false;
 }
 

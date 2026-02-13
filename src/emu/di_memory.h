@@ -29,7 +29,7 @@ public:
     // WHY:  The CPU needs to know: "If I read 0x8000, who answers?"
     // HOW:  The specific CPU implementation overrides this to point to 
     //       the specific "Eater 6502" memory map function.
-    virtual void memory_map(address_map &map) { } // Default is empty map
+    virtual void memory_map(address_map & /*&map*/) { } // Default is empty map
 
     // ========================================================================
     //  Memory Accessors

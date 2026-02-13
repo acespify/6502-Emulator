@@ -3,11 +3,75 @@
 #include "../../devices/video/nhd_0216k1z.h" // Required for m_lcd->get_display_lines()
 #include "../../../vendor/imgui/imgui.h"
 #include <cstdio>
+#include <cstdlib>
+#include <string>
 #include <cmath>
+#include <windows.h>
+#include <vector>
 
 // We need the CPU definition to access registers (A, X, Y, PC)
 // Ensure this path matches where you put your CPU file
 #include "devices/cpu/m6502.h" 
+
+std::vector<LogEntry> DebugView::m_logs;
+
+void DebugView::add_log(LogType type, const char* fmt, ...){
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+
+    m_logs.push_back({ std::string(buf), type });
+    
+    // Keep the log from growing forever
+    if (m_logs.size() > 500) m_logs.erase(m_logs.begin());
+}
+
+// A Helper to launch external apps non-blocking
+void DebugView::LaunchAssembler() {
+#ifdef _WIN32
+    // Get the path of the current running .exe (eater.exe)
+    char buffer[MAX_PATH];
+    GetModuleFileNameA(NULL, buffer, MAX_PATH);
+    std::string path(buffer);
+    
+    // Remove "eater.exe" to get just the directory
+    size_t pos = path.find_last_of("\\/");
+    std::string dir = (pos != std::string::npos) ? path.substr(0, pos) : "";
+
+    // Build the full path to the assembler in the same directory
+    std::string assembler_path = dir + "\\Assembler.exe";
+
+    // 3. Prepare Win32 Startup structures
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+
+    // Try to launch the process
+    if (CreateProcessA(NULL, (LPSTR)assembler_path.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+        // SUCCESS: Update status bar
+        m_status_message = "Success: Assembler Studio Launched";
+        m_status_timer = 5.0f; // Show for 5 seconds
+        
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+    } else {
+        // FAILURE: Update status bar with error
+        m_status_message = "Error: Could not find Assembler.exe";
+        m_status_timer = 8.0f;
+        
+        fprintf(stderr, "[ERROR] Could not launch assembler at %s. Error code: %lu\n", 
+                assembler_path.c_str(), GetLastError());
+    }
+#else
+    system("./Assembler &");
+    m_status_message = "Launched Assembler (Linux)";
+    m_status_timer = 3.0f;
+#endif
+}
 
 // ============================================================================
 // Constructor
@@ -39,14 +103,16 @@ void DebugView::draw(bool& is_paused, bool& step_request) {
     draw_menu_bar(is_paused, step_request);
 
     // 2. Draw Windows (if enabled)
-    if (m_show_cpu)     draw_cpu_window(is_paused, step_request);
-    if (m_show_stack)   draw_stack_smart();
-    if (m_show_via)     draw_via_window();
-    if (m_show_acia)    draw_acia_window();
-    if (m_show_ram)     draw_memory_window();
-    if (m_show_lcd)     draw_lcd_window();
-    if (m_show_rom)     draw_rom_window();
-    if (m_show_speed)   draw_speed_control();
+    if (m_show_cpu)         draw_cpu_window(is_paused, step_request);
+    if (m_show_stack)       draw_stack_smart();
+    if (m_show_via)         draw_via_window();
+    if (m_show_acia)        draw_acia_window();
+    if (m_show_ram)         draw_memory_window();
+    if (m_show_lcd)         draw_lcd_window();
+    if (m_show_rom)         draw_rom_window();
+    if (m_show_speed)       draw_speed_control();
+    if (m_show_status_bar)  draw_status_bar();
+    if (m_show_log)         draw_log_window();
 }
 
 // ============================================================================
@@ -82,6 +148,56 @@ void DebugView::draw_menu_bar(bool& is_paused, bool& step_request) {
             ImGui::MenuItem("Rom",           nullptr, &m_show_rom);
             ImGui::MenuItem("LCD Display",   nullptr, &m_show_lcd);
             ImGui::MenuItem("Speed Control", nullptr, &m_show_speed);
+            ImGui::EndMenu();
+        }
+
+        // --- NEW TOOLS MENU ---
+        if (ImGui::BeginMenu("Tools")) {
+            
+            /*// Example 1: Open the ROM file in your default Hex Editor / Text Editor
+            if (ImGui::MenuItem("Open ROM File")) {
+                LaunchExternal("rom.bin");
+            }
+
+            // Example 2: Open System Calculator (Handy for hex math)
+            if (ImGui::MenuItem("Calculator")) {
+                #ifdef _WIN32
+                    LaunchExternal("calc.exe");
+                #elif __APPLE__
+                    LaunchExternal("-a Calculator");
+                #else
+                    LaunchExternal("gnome-calculator"); // or kcalc
+                #endif
+            }
+            // Example 3: Open Terminal / Command Prompt
+            if (ImGui::MenuItem("Open Terminal")) {
+                #ifdef _WIN32
+                    LaunchExternal("cmd.exe");
+                #else
+                    LaunchExternal("x-terminal-emulator");
+                #endif
+            }*/
+           ImGui::MenuItem("Debug View Log", nullptr, &m_show_log);
+            // 6502 Assembler studio
+            if (ImGui::MenuItem("6502 Assembler Studio")){
+                LaunchAssembler();
+            }
+            
+
+            ImGui::Separator();
+
+            // Example 4: Open a specific custom tool (e.g., your assembler)
+            // You can hardcode paths or use relative paths
+            if (ImGui::MenuItem("Run ROM Generator")) {
+                 // Note: This runs the generator, but won't show output unless you pause to look at the console
+                 // or wrap it in a script that pauses.
+                 #ifdef _WIN32
+                    system("start cmd /k python tools\\rom_build.py"); 
+                 #else
+                    system("python3 tools/rom_build.py");
+                 #endif
+            }
+
             ImGui::EndMenu();
         }
 
@@ -556,6 +672,63 @@ void DebugView::draw_speed_control() {
     ImGui::Separator();
     ImGui::Text("Current Target: %d Hz", m_target_hz);
 
+    ImGui::End();
+}
+
+void DebugView::draw_status_bar() {
+    // Position at the very bottom of the viewport
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + viewport->Size.y - ImGui::GetFrameHeight()));
+    ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, ImGui::GetFrameHeight()));
+
+    // Use transparent background and no decorations
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings;
+    
+    // Set a subtle background color (darker than your clear color)
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f)); 
+    
+    if (ImGui::Begin("##StatusBar", nullptr, flags)) {
+        ImGui::TextUnformatted(m_status_message.c_str());
+        ImGui::End();
+    }
+    ImGui::PopStyleColor();
+
+    // Handle the timer logic
+    if (m_status_timer > 0) {
+        m_status_timer -= ImGui::GetIO().DeltaTime;
+        if (m_status_timer <= 0) {
+            m_status_message = "Ready";
+        }
+    }
+}
+
+void DebugView::draw_log_window() {
+    if (!m_show_log) return;
+
+    ImGui::SetNextWindowSize(ImVec2(500, 400), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("System Log", &m_show_log)){
+        if(ImGui::Button("Clear")) m_logs.clear();
+        ImGui::SameLine();
+        if (ImGui::Button("Copy to Clipboard")) { /* ... */}
+
+        ImGui::Separator();
+
+        ImGui::BeginChild("ScrollingRegion", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+        for (const auto& entry : m_logs) {
+            ImVec4 color = ImVec4(1,1,1,1); // Default White
+            if (entry.type == LOG_CPU)   color = ImVec4(0.7f, 0.7f, 1.0f, 1.0f); // Soft Blue
+            if (entry.type == LOG_IO)    color = ImVec4(0.0f, 1.0f, 1.0f, 1.0f); // Cyan
+            if (entry.type == LOG_ERROR) color = ImVec4(1.0f, 0.4f, 0.4f, 1.0f); // Red
+
+            ImGui::TextColored(color, "%s", entry.text.c_str());
+        }
+
+        // Auto-Scroll logic
+        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+            ImGui::SetScrollHereY(1.0f);
+        
+        ImGui::EndChild();
+    }
     ImGui::End();
 }
 

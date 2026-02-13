@@ -1,4 +1,8 @@
 #include "renderer.h"
+#include <iostream>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "../../vendor/stb_image/stb_image.h"
 
 Renderer::Renderer() : m_window(nullptr), m_is_active(false) {}
 
@@ -59,9 +63,22 @@ bool Renderer::init(int width, int height, const char* title) {
 
     m_window = glfwCreateWindow(width, height, title, NULL, NULL);
     if (!m_window) {
-        printf("ERROR: Failed to create GLFW window\n");
+        std::cerr << "ERROR: Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return false;
+    }
+
+    // Icon loading 
+    GLFWimage images[1];
+    // Load the image (Supports PNG, JPG, BMP, etc.)
+    images[0].pixels = stbi_load("assets/icon6502.png", &images[0].width, &images[0].height, 0, 4); 
+    
+    if (images[0].pixels) {
+        // Set the icon
+        glfwSetWindowIcon(m_window, 1, images); 
+        stbi_image_free(images[0].pixels);
+    } else {
+        std::cerr << "Warning: Could not load icon.png" << std::endl;
     }
 
     glfwMakeContextCurrent(m_window);

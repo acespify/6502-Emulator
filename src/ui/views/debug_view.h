@@ -3,6 +3,9 @@
 
 #include <imgui.h>
 #include <cstdint>
+#include <string>
+#include <vector>
+#include <cstdarg>
 
 // ============================================================================
 // Forward Declarations
@@ -15,6 +18,13 @@ class w65c51;       // Placeholder for U7
 class mb_driver;    // Placeholder for your mainboard/driver
 class nhd_0216k1z;
 
+enum LogType { LOG_INFO, LOG_CPU, LOG_IO, LOG_ERROR };
+
+struct LogEntry {
+    std::string text;
+    LogType type;
+};
+
 class DebugView {
 public:
     // Constructor: We pass pointers to hardware. 
@@ -26,6 +36,8 @@ public:
 
     // Getter for the main loop to read
     int get_target_hz() const { return m_target_hz;}
+
+    static void add_log(LogType type, const char* fmt, ...);
 private:
     // ----- Hardware Pointers -----
     mb_driver* m_driver;
@@ -37,23 +49,31 @@ private:
     // UI Buffers
     char m_rom_path[256] = "rom.bin";
     char m_status_msg[128] = "System Ready";
+    static std::vector<LogEntry> m_logs;
+
+    std::string m_status_message = "Ready";
+    float m_status_timer = 0.0f;
 
     // Speed Control State
     // Default to 1MHz (1,000,000 Hz)
     int m_target_hz = 1000000;
 
     // --- Window Visibility Flags ---
-    bool m_show_cpu     = true;
-    bool m_show_stack   = true;
-    bool m_show_via     = false;
-    bool m_show_acia    = false;
-    bool m_show_ram     = true;  // Generic Memory Viewer
-    bool m_show_lcd     = true;
-    bool m_show_rom     = false;
-    bool m_show_speed   = false;
+    bool m_show_cpu         = true;
+    bool m_show_stack       = true;
+    bool m_show_via         = false;
+    bool m_show_acia        = false;
+    bool m_show_ram         = true;  // Generic Memory Viewer
+    bool m_show_lcd         = true;
+    bool m_show_rom         = false;
+    bool m_show_speed       = false;
+    bool m_show_status_bar  = true;
+    bool m_show_log         = true;
 
     // --- Helper Functions ---
+    void LaunchAssembler();
     void draw_menu_bar(bool& is_paused, bool& step_request);
+    void draw_status_bar();
     
     // Renders the "00 01 02..." hex header for memory views
     void draw_byte_header(int columns = 16, const char* padding = "      ");
@@ -68,6 +88,7 @@ private:
     void draw_lcd_window();
     void draw_rom_window();
     void draw_speed_control();
+    void draw_log_window();
 };
 
 #endif // DEBUG_VIEW_H

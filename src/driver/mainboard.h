@@ -39,7 +39,14 @@ public:
     nhd_0216k1z* get_lcd() { return &m_lcd; }
 
     bool load_rom(const char* filename) {
-        return m_rom.load_from_file(filename);
+        std::cout << "[Driver] Attempting to load ROM from: " << filename << std::endl;
+        bool result = m_rom.load_from_file(filename);
+        if (result) {
+            std::cout << "[Driver] Success! ROM loaded." << std::endl;
+        } else {
+            std::cerr << "[Driver] Failed to load ROM." << std::endl;
+        }
+        return result;
     }
 
 private:

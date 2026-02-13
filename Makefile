@@ -1,98 +1,148 @@
-# =========================================================================
-# Project: Eater 6502 Emulator
-# =========================================================================
+# ==========================================
+# EATER 6502 EMULATOR - STATIC BUILD
+# ==========================================
 
-TARGET_EXEC := eater.exe
-BUILD_DIR   := ./build
-SRC_DIR     := ./src
-VENDOR_DIR  := ./vendor
+APP_NAME      := eater.exe
+CXX           := g++
+CXXFLAGS      := -std=c++17 -g -Wall -Wextra -D_WIN32_WINNT=0x0A00
 
-CXX         := g++
-# Added -I./src to the root flags so you can do #include "driver/mb_driver.h"
-CXXFLAGS    := -std=c++17 -O2 -g -Wall -D_WIN32_WINNT=0x0A00 -I$(SRC_DIR)
+# Directories
+BUILD_DIR     := build
+SRC_DIR       := src
+LIB_SRC_DIR	  := libs
+ASSETS_DIR	  := assets
+VENDOR_DIR    := vendor
+IMGUI_DIR     := $(VENDOR_DIR)/imgui
+
+# Include Paths (Adjusted for your structure)
+# Note: We include SRC_DIR so #include "devices/cpu/m6502.h" works
+INCLUDES      := -I$(SRC_DIR) \
+                 -I$(IMGUI_DIR) \
+                 -I$(IMGUI_DIR)/backends \
+                 -I$(VENDOR_DIR)/GLFW/include \
+                 -I$(VENDOR_DIR)/glfw/include \
+                 -I$(VENDOR_DIR) \
+                 -I$(VENDOR_DIR)/stb_image \
+                 -I$(VENDOR_DIR)/asio/include
+
+# --- RESOURCE COMPILER ---
+WINDRES       := windres
+RESOURCE_FILE := $(SRC_DIR)/eater.rc
+# Check if resource file exists before trying to compile it
+ifneq ("$(wildcard $(RESOURCE_FILE))","")
+    RESOURCE_OBJ := $(BUILD_DIR)/obj/eater.res
+endif
+
+# --- LINKING ---
+# 1. Library Paths
+LDFLAGS       := -L$(VENDOR_DIR)/GLFW/lib
+
+# 2. Libraries (Static Link)
+# -static flags ensure we don't need MinGW DLLs at runtime
+LIBS          := -lglfw3 -lopengl32 -lgdi32 -lws2_32 -lmswsock -limm32 -lwinmm -static-libgcc -static-libstdc++ #-mwindows
 
 # -------------------------------------------------------------------------
-# 1. Bulletproof Source Discovery (Recursive Wildcard)
+# SOURCE DISCOVERY
 # -------------------------------------------------------------------------
-# This function recursively searches a folder for files matching a pattern
-# It works on ALL systems (Windows/Linux/Mac) without external tools.
+# Recursive wildcard function (Works on Windows/Linux)
 rwildcard=$(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
-# Find ALL .cpp files in src/ (and subfolders)
+# 1. Project Sources (Filter out the generator tool)
 ALL_PROJECT_SRCS := $(call rwildcard,$(SRC_DIR),*.cpp)
+PROJECT_SRCS     := $(filter-out %rom_generator.cpp, $(ALL_PROJECT_SRCS))
 
-# Filter out the generator tool
-PROJECT_SRCS := $(filter-out %rom_generator.cpp, $(ALL_PROJECT_SRCS))
+# 2. Vendor Sources (ImGui)
+VENDOR_SRCS      := $(IMGUI_DIR)/imgui.cpp \
+                    $(IMGUI_DIR)/imgui_draw.cpp \
+                    $(IMGUI_DIR)/imgui_tables.cpp \
+                    $(IMGUI_DIR)/imgui_widgets.cpp \
+                    $(IMGUI_DIR)/imgui_demo.cpp \
+                    $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp \
+                    $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
 
-# Vendor Sources (ImGui)
-IMGUI_DIR   := $(VENDOR_DIR)/imgui
-VENDOR_SRCS := $(IMGUI_DIR)/imgui.cpp \
-               $(IMGUI_DIR)/imgui_draw.cpp \
-               $(IMGUI_DIR)/imgui_tables.cpp \
-               $(IMGUI_DIR)/imgui_widgets.cpp \
-               $(IMGUI_DIR)/imgui_demo.cpp \
-               $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp \
-               $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
+# 3. Object Lists
+PROJECT_OBJS := $(PROJECT_SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/obj/%.o)
+VENDOR_OBJS  := $(VENDOR_SRCS:$(VENDOR_DIR)/%.cpp=$(BUILD_DIR)/vendor/%.o)
 
-# --- KEY CHANGE: Define Object Lists Separately ---
-PROJECT_OBJS := $(PROJECT_SRCS:%=$(BUILD_DIR)/obj/%.o)
-VENDOR_OBJS  := $(VENDOR_SRCS:%=$(BUILD_DIR)/obj/%.o)
-
-# Combine lists
-OBJS := $(PROJECT_SRCS:%=$(BUILD_DIR)/obj/%.o) $(VENDOR_SRCS:%=$(BUILD_DIR)/obj/%.o)
+# Combined Objects
+OBJS := $(PROJECT_OBJS) $(VENDOR_OBJS)
 DEPS := $(OBJS:.o=.d)
 
-# -------------------------------------------------------------------------
-# 2. Includes & Libraries
-# -------------------------------------------------------------------------
-# Note: We do NOT include source folders here anymore. 
-# You should include files relative to 'src', e.g. #include "devices/cpu/m6502.h"
-INC_FLAGS := -I$(VENDOR_DIR)/imgui \
-             -I$(VENDOR_DIR)/imgui/backends \
-             -I$(VENDOR_DIR)/GLFW/include \
-             -I$(VENDOR_DIR)/glfw/include \
-             -I$(VENDOR_DIR) \
-             -I$(VENDOR_DIR)/stb_image \
-             -I$(VENDOR_DIR)/asio/include
+# ==========================================
+# TARGETS
+# ==========================================
 
-LDFLAGS := -L$(VENDOR_DIR)/GLFW/lib -lglfw3 -lgdi32 -lopengl32 -lws2_32 -lmswsock -static-libgcc -static-libstdc++
+all: $(BUILD_DIR)/$(APP_NAME) copy-dlls copy-assets copy-tools
 
-# -------------------------------------------------------------------------
-# 3. Build Rules
-# -------------------------------------------------------------------------
-
-$(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
-	@echo "Linking $(TARGET_EXEC)..."
+# Link Final Executable
+$(BUILD_DIR)/$(APP_NAME): $(OBJS) $(RESOURCE_OBJ)
+	@echo "Linking $(APP_NAME)..."
 	@mkdir -p $(dir $@)
-	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
-	@echo "Build Success! Run: $(BUILD_DIR)/$(TARGET_EXEC)"
+	@$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS) $(LIBS)
+	@echo "Build Success! Run: $(BUILD_DIR)/$(APP_NAME)"
 
-# Compile C++
-$(BUILD_DIR)/obj/%.cpp.o: %.cpp
-	@echo "Compiling $<..."
+# Copy DLLs Target
+copy-dlls:
+	@echo "Copying DLLs from $(LIB_SRC_DIR) to $(BUILD_DIR)..."
+	@mkdir -p $(BUILD_DIR)
+	@if [ -d "$(LIB_SRC_DIR)" ]; then cp $(LIB_SRC_DIR)/*.dll $(BUILD_DIR)/ 2>/dev/null || :; fi
+	@echo "DLL Deployment Complete."
+
+# Copy Assets
+copy-assets:
+	@echo "Deploying Assets..."
+	@mkdir -p $(BUILD_DIR)/assets
+	@if [ -d "$(ASSETS_DIR)" ]; then cp -r $(ASSETS_DIR)/* $(BUILD_DIR)/assets/ 2>/dev/null || :; fi
+	@echo "Assets have been Deployed..."
+
+# Copy Tools
+copy-tools:
+	@echo "Deploying Assembler..."
+	@mkdir -p $(BUILD_DIR)
+	@if [ -f "tools/Assembler/Assembler.exe" ]; then cp "tools/Assembler/Assembler.exe" $(BUILD_DIR)/; fi
+	@echo "Tools have been Deployed..."
+
+# Compile Project C++ Files
+$(BUILD_DIR)/obj/%.o: $(SRC_DIR)/%.cpp
+	@echo "Compiling $<"
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INC_FLAGS) -MMD -MP -c $< -o $@
+	@$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP -c $< -o $@
 
-.PHONY: clean clean-all info
+# Compile Vendor C++ Files (ImGui)
+$(BUILD_DIR)/vendor/%.o: $(VENDOR_DIR)/%.cpp
+	@echo "Compiling Vendor $<"
+	@mkdir -p $(dir $@)
+	@$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
-# -------------------------------------------------------------------------
-# 4. Cleaning Rules 
-# -------------------------------------------------------------------------
+# Compile Resource File (if it exists)
+$(BUILD_DIR)/obj/%.res: $(SRC_DIR)/%.rc
+	@echo "Compiling Resource $<"
+	@mkdir -p $(dir $@)
+	@$(WINDRES) $< -O coff -o $@
 
+# --- UTILITY COMMANDS ---
 
-# 'make clean' -> Removes ONLY project objects + executable. Keeps ImGui compiled.
+# Run the emulator
+run: all
+	@echo "Running..."
+	@./$(BUILD_DIR)/$(APP_NAME)
+
+# Clean only project files
 clean:
-	@echo "Cleaning project files (keeping vendor objects)..."
-	@rm -f $(PROJECT_OBJS)
-	@rm -f $(PROJECT_OBJS:.o=.d)
-	@rm -f $(BUILD_DIR)/$(TARGET_EXEC)
+	@echo "Cleaning Project Files..."
+	@rm -rf $(BUILD_DIR)/obj
+	@rm -f $(BUILD_DIR)/$(APP_NAME)
 
+# Clean everything (including ImGui)
 clean-all:
-	@echo "Cleaning build directory..."
+	@echo "Cleaning Everything..."
 	@rm -rf $(BUILD_DIR)
 
+# Debug Info
 info:
-	@echo "--------------------------------------"
-	@echo "Detected Sources:"
-	@echo $(PROJECT_SRCS)
-	@echo "--------------------------------------"
+	@echo "Project Sources: $(PROJECT_SRCS)"
+	@echo "Vendor Sources: $(VENDOR_SRCS)"
+
+.PHONY: all run clean clean-all info
+
+-include $(DEPS)

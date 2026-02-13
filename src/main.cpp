@@ -15,12 +15,13 @@
 // ============================================================================
 // 4. MAIN ENTRY POINT
 // ============================================================================
-int main(int argc, char* argv[]) {
-    std::cout << "[System] Initializing Emulator..." << std::endl;
+int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
+    std::cerr << "[System] Initializing Emulator..." << std::endl;
 
     // 1. Setup UI
     Renderer renderer;
     if (!renderer.init(1920, 1080, "Ben Eater 6502 Emulator")) {
+        std::cerr << "[System] Renderer Init Failed!" << std::endl;
         return -1;
     }
 
@@ -42,6 +43,8 @@ int main(int argc, char* argv[]) {
     // Target: 60FPS (16.66ms per frame)
     const int UI_FPS = 60;
     const auto ui_frame_duration = std::chrono::microseconds(1000000 / UI_FPS);
+
+    std::cerr << "Starting Main Loop..." << std::endl;
 
     // 4. Main Loop
     while (!renderer.should_close()) {
@@ -95,7 +98,7 @@ int main(int argc, char* argv[]) {
             std::this_thread::sleep_for(ui_frame_duration - elapsed);
         }
     }
-
+    std::cerr << "Main Loop Exited." << std::endl;
     renderer.shutdown();
     return 0;
 }
