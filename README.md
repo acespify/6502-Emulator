@@ -1,3 +1,4 @@
+<a id= "top"></a>
 # 6502-Emulator
 
 A cycle-accurate, component-level emulator of the Ben Eater 6502 breadboard computer. This project simulates the hardware behavior of the W65C02S CPU, W65C22 VIA, and NHD-0216K1Z LCD (in 8-bit mode), wrapped in a modern graphical debugger built with Dear ImGui.
@@ -185,7 +186,7 @@ This is a Emulator based on Ben Eaters 6502 computer and first schematic without
 Ben's Schematic with the Serial Interface 
 ![Ben Eater Schematic 6502 Computer](6502/6502_eater_schematic1.png)
 
-[Back to Table of Contents](#table-of-contents)
+[Back to Table of Contents](#table-of-contents) [Back to Top](#top)
 
 License
 
