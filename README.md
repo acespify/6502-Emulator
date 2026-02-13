@@ -42,7 +42,7 @@ Emulated Components
 |AT28C256    |    ROM      |   32KB EEPROM                 |    Mapped to $8000 - $FFFF.                 |
 |62256       |    RAM      |   32KB SRAM                   |    Mapped to $0000 - $3FFF.                 |
 
-
+[Back to Table of Contents](#table-of-contents)
 
  ## **Directory Structure**
 
@@ -92,6 +92,7 @@ The project is organized by hardware device types, drivers, and UI components.
 ├── vendor/                    # Third-party libraries (ImGui, GLFW, etc.)
 └── Makefile                   # Build Configuration
 ```
+[Back to Table of Contents](#table-of-contents)
 
 ## **Features**
 
@@ -119,6 +120,8 @@ Execution Control: Step-by-step execution or full-speed running (locked to 1MHz)
 
 Includes a rom_generator tool that allows you to write "Assembly-in-C++". It compiles directly to a rom.bin file, handling label resolution and opcode emission automatically.
 
+[Back to Table of Contents](#table-of-contents)
+
 ## **Getting Started**
 
 Prerequisites
@@ -135,6 +138,8 @@ Prerequisites
     * **OpenGL / GLFW**
 
     * **Dear ImGui** (Included in vendor/)
+
+[Back to Table of Contents](#table-of-contents)
 
 ## **Installation**
 
@@ -163,6 +168,8 @@ make
 
 ./build/eater.exe
 
+[Back to Table of Contents](#table-of-contents)
+
  ## **Media Gallery**
 
 **CPU & Stack Inspector**
@@ -176,6 +183,8 @@ This is a Emulator based on Ben Eaters 6502 computer and first schematic without
 
 Ben's Schematic with the Serial Interface 
 ![Ben Eater Schematic 6502 Computer](6502/6502_eater_schematic1.png)
+
+[Back to Table of Contents](#table-of-contents)
 
 License
 
