@@ -88,7 +88,8 @@ The project is organized by hardware device types, drivers, and UI components.
 │   │   └── renderer.h
 │   └── main.cpp               # Entry Point
 ├── tools/
-│   └── rom_build.py           # C++ Assembly Tool for Firmware
+│   ├── Assembler.exe          # An Assembler for the 6502
+│   └── rom_build.py           # Assembly Tool for Firmware
 ├── vendor/                    # Third-party libraries (ImGui, GLFW, etc.)
 └── Makefile                   # Build Configuration
 ```
