@@ -136,7 +136,7 @@ Prerequisites
 
     * **Dear ImGui** (Included in vendor/)
 
-##Installation
+## **Installation**
 
 1.  **Clone the repository**
 
@@ -163,7 +163,7 @@ make
 
 ./build/eater.exe
 
- ##Media Gallery
+ ## **Media Gallery**
 
 **CPU & Stack Inspector**
 
