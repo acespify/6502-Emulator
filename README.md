@@ -13,7 +13,7 @@ A cycle-accurate, component-level emulator of the Ben Eater 6502 breadboard comp
 - [Usage](#usage)
 - [Media Gallery](#media-gallery)
 
- About The Project
+ ## About The Project
 
 This emulator goes beyond simple instruction simulation. It models the physical interconnects of the breadboard computer, including address decoding logic, memory mapping, and peripheral interface adapters.
 
@@ -25,7 +25,7 @@ LCD Controller State Machine: The ST7066U controller is emulated in detail, incl
 
 ROM Generation: Includes a custom C++ based assembler/generator to create binary ROM images directly from code.
 
- Hardware Architecture
+## Hardware Architecture
 
 The emulator replicates the following schematic:
 
@@ -44,7 +44,7 @@ Emulated Components
 
 
 
- **Directory Structure**
+ ## **Directory Structure**
 
 The project is organized by hardware device types, drivers, and UI components.
 
@@ -93,7 +93,7 @@ The project is organized by hardware device types, drivers, and UI components.
 └── Makefile                   # Build Configuration
 ```
 
- Features
+## **Features**
 
  Accurate LCD Emulation
 
@@ -119,7 +119,7 @@ Execution Control: Step-by-step execution or full-speed running (locked to 1MHz)
 
 Includes a rom_generator tool that allows you to write "Assembly-in-C++". It compiles directly to a rom.bin file, handling label resolution and opcode emission automatically.
 
- Getting Started
+## **Getting Started**
 
 Prerequisites
 
@@ -136,7 +136,7 @@ Prerequisites
 
     * **Dear ImGui** (Included in vendor/)
 
-Installation
+##Installation
 
 1.  **Clone the repository**
 
@@ -163,7 +163,7 @@ make
 
 ./build/eater.exe
 
- Media Gallery
+ ##Media Gallery
 
 **CPU & Stack Inspector**
 
