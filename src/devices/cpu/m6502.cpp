@@ -331,9 +331,9 @@ void m6502_p::execute_run() {
 
         // We log the Program Counter (PC-1 because it was just incremented) 
         // and the hex value of the opcode.
-        //if (m_is_stepping || m_is_paused) {
-        //    DebugView::add_log(LOG_CPU, "[$%04X] EXEC: %02X", (PC - 1), opcode);
-        //}
+        if (DebugView::m_en_cpu_trace) {
+            DebugView::add_log(LOG_CPU, "[$%04X] EXEC: %02X", (PC - 1), opcode);
+        }
         
         m_cycles = lookup[opcode].cycles;
         u8 extra1 = (this->*lookup[opcode].addrmode)();

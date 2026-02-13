@@ -344,7 +344,10 @@ void nhd_0216k1z::write_4bit(u8 data_lines, bool rs, bool rw, bool e) {
 //  8-BIT INTERFACE
 // ============================================================================
 void nhd_0216k1z::write_8bit(u8 byte, bool rs, [[maybe_unused]] bool rw) {
-    DebugView::add_log(LOG_IO, "LCD %s: %02X (RS:%d)", rw ? "READ" : "WRITE", byte, rs);
+    if (DebugView::m_enable_trace) {
+        DebugView::add_log(LOG_IO, "LCD %s: %02X (RS:%d)", rw ? "READ" : "WRITE", byte, rs);
+    }
+
     // Direct execution, no nibble assembly needed
     if (rs) write_data(byte);
     else    process_instruction(byte);
