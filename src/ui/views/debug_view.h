@@ -37,9 +37,11 @@ public:
     // Getter for the main loop to read
     int get_target_hz() const { return m_target_hz;}
 
+    // Tracing 
     static void add_log(LogType type, const char* fmt, ...);
     static bool m_enable_trace; // Static boolean to toggle from the UI
-    static bool m_en_cpu_trace;
+    static bool m_en_cpu_trace; // Static boolean to trace the cpu instructions
+
 private:
     // ----- Hardware Pointers -----
     mb_driver* m_driver;
