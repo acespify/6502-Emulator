@@ -18,7 +18,7 @@ class w65c51 : public device_memory_interface {
 public:
     w65c51();
 
-    void reset();
+    void reset(); // Added RESET functionality to the component.
 
     // --- CPU Interface ---
     u8 read(u16 addr);
