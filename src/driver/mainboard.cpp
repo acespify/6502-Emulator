@@ -1,3 +1,10 @@
+// ============================================================================
+// Copyright (c) 2026 Andrew Young
+// This software is released under the MIT License.
+// https://opensource.org/licenses/MIT
+// 
+// ============================================================================
+
 #include "mainboard.h"
 #include "../emu/map.h"
 #include <iostream>
@@ -34,10 +41,14 @@ class mb_driver::board_cpu : public m6502_p {
 mb_driver::mb_driver() {
     // Create the CPU and connect it to this board
     m_cpu = new board_cpu(this);
+    
+    // Wiring in the MAX232 directly to the ACIA
+    m_serial_port = new Serial_Port(&m_acia);
 }
 
 mb_driver::~mb_driver() {
     delete m_cpu;
+    delete m_serial_port;
 }
 
 m6502_p* mb_driver::get_cpu() {
@@ -49,9 +60,9 @@ void mb_driver::init() {
 
     // 1. Load Firmware
     // (Ensure you have a 'rom.bin' or this stays 0xFF)
-    if (!m_rom.load_from_file("rom.bin")) {
-        std::cerr << "[Board] Warning: rom.bin not found. ROM is empty." << std::endl;
-    }
+    //if (!m_rom.load_from_file("rom.bin")) {
+    //    std::cerr << "[Board] Warning: rom.bin not found. ROM is empty." << std::endl;
+    //}
 
     // Default to Schematic 1
     set_machine_type(MachineType::SCHEMATIC_1_BASIC);
@@ -65,6 +76,8 @@ void mb_driver::init() {
 void mb_driver::set_machine_type(MachineType type) {
     m_current_type = type;
     
+    std::cout << "[Driver] Switching hardware schematic..." << std::endl;
+
     // 1. Reset Internal State
     m_last_e_state = false;
     m_port_b_data = 0;
@@ -89,8 +102,14 @@ void mb_driver::set_machine_type(MachineType type) {
 
     // --- SCHEMATIC SPECIFIC WIRING ---
     if (m_current_type == MachineType::SCHEMATIC_1_BASIC) {
-        std::cout << "[Board] Configured for Schematic 1 (Basic)" << std::endl;
-        
+        if(!load_rom("rom.bin")){
+             std::cerr << "[Warning] Could not find default rom.bin for Basic Schematic." << std::endl;
+        }
+       
+        // DISCONNECT SERIAL when switching back to the BASIC Schematic
+        if (m_serial_port->is_connected()){
+            m_serial_port->disconnect();
+        }
         // SCHEMATIC 1: LCD on Port B (Data) + Port A (Control)
         // PB0-7 = Data Bus
         // PA5=RS, PA6=RW, PA7=E
@@ -112,11 +131,33 @@ void mb_driver::set_machine_type(MachineType type) {
         });
     }
     else if (m_current_type == MachineType::SCHEMATIC_2_SERIAL) {
-        std::cout << "[Board] Configured for Schematic 2 (Serial)" << std::endl;
+        if (!load_rom("rs232.bin")){
+            std::cerr << "[Warning] Could not find default wozmon.bin for Serial Schematic." << std::endl;
+        }
         
-        // SCHEMATIC 2: 
-        // (You will implement the specific wiring here later based on the 2nd schematic image)
-        // For now, leave it blank or default to Basic behavior.
+        m_serial_port->connect("COM5", 9600);
+        
+        // SCHEMATIC 2: LCD in 4-bit mode entirely on Port B
+        // PB0-PB3 = Data Nibble
+        // PB4 = RS, PB5 = R/~W, PB6 = E
+
+        m_via.set_port_b_callback([this](u8 data) {
+            // Mask out the control bits to get just the 4-bit data (PB0-PB3)
+            m_port_b_data = data & 0x0F;
+
+            // Extracting the Control Pins
+            bool rs = (data & 0x10); // Bit 4
+            bool rw = (data & 0x20); // Bit 5
+            bool e  = (data & 0x40); // Bit 6
+
+            // The HD44780 LCD reads data exactly when the Enable pin goes from HIGH to LOW.
+            if (m_last_e_state && !e) {
+                // The LCD class takes (data, rs, rw) like the 8-bit version does
+                m_lcd.write_4bit(m_port_b_data, rs, rw, e);
+            }
+            m_last_e_state = e;
+            
+        });
     }
 
     // 4. Clear Lines
@@ -136,6 +177,7 @@ void mb_driver::reset() {
     m_cpu->set_input_line(m6502_p::NMI_LINE, 0);
 
     m_cpu->device_reset();
+    
 
     // If this stay 1 (Active), the CPU will sit at $8000 forever.
     //m_cpu->set_input_line(m6502_p::RESET_LINE, 0);
@@ -146,6 +188,11 @@ void mb_driver::run(int cycles) {
     m_cpu->icount_set(cycles);
 
     m_via.clock();
+
+    // Drain the ACIA's transmit buffer to the physical COM Port
+    if (m_serial_port) {
+        m_serial_port->update();
+    }
 
     // Run the CPU
     m_cpu->execute_run();

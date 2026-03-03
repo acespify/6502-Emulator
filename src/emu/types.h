@@ -1,3 +1,9 @@
+// ============================================================================
+// Copyright (c) 2026 Andrew Young
+// This software is released under the MIT License.
+// https://opensource.org/licenses/MIT
+// 
+// ============================================================================
 //======================================================================
 // The first step in the coding process: The way MAME developers and 
 // low level coders in general, create a easier way to define a strict,

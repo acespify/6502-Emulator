@@ -1,3 +1,9 @@
+// ============================================================================
+// Copyright (c) 2026 Andrew Young
+// This software is released under the MIT License.
+// https://opensource.org/licenses/MIT
+// 
+// ============================================================================
 #include "device.h"
 
 device_t::device_t(machine_config &mconfig, const std::string &tag, device_t *owner, u32 clock)

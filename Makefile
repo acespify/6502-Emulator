@@ -9,13 +9,49 @@ CXXFLAGS      := -std=c++17 -g -Wall -Wextra -D_WIN32_WINNT=0x0A00
 # Directories
 BUILD_DIR     := build
 SRC_DIR       := src
-LIB_SRC_DIR	  := libs
-ASSETS_DIR	  := assets
+LIB_SRC_DIR   := libs
+ASSETS_DIR    := assets
 VENDOR_DIR    := vendor
 IMGUI_DIR     := $(VENDOR_DIR)/imgui
 
-# Include Paths (Adjusted for your structure)
-# Note: We include SRC_DIR so #include "devices/cpu/m6502.h" works
+.DEFAULT_GOAL := all
+
+.PHONY: all run clean clean-all info copy-dlls copy-assets copy-tools bump_build
+
+# ==========================================
+# VERSIONING SYSTEM
+# ==========================================
+
+VERSION      := 0.1.0
+GIT_HASH     := $(shell git rev-parse --short HEAD 2>/dev/null || echo "nogit")
+BUILD_DATE   := $(shell date +"%Y-%m-%d %H:%M:%S")
+BUILD_FILE   := build_number.txt
+BUILD_NUMBER := $(shell [ -f $(BUILD_FILE) ] && cat $(BUILD_FILE) || echo 0)
+
+# Calculate the next number safely, avoiding Windows shell math bugs
+NEXT_BUILD_NUMBER := $(shell expr $(BUILD_NUMBER) + 1)
+
+VERSION_HEADER := $(SRC_DIR)/version.h
+
+# Generate version.h ONLY if it doesn't exist (Preserves incremental builds!)
+$(VERSION_HEADER): $(wildcard .git/HEAD) $(wildcard .git/index) $(BUILD_FILE)
+	@echo "Generating version.h..." 
+	@echo "#pragma once" > $(VERSION_HEADER) 
+	@echo "#define APP_VERSION \"$(VERSION)\"" >> $(VERSION_HEADER) 
+	@echo "#define APP_GIT_HASH \"$(GIT_HASH)\"" >> $(VERSION_HEADER) 
+	@echo "#define APP_BUILD_DATE \"$(BUILD_DATE)\"" >> $(VERSION_HEADER) 
+	@echo "#define APP_BUILD_NUMBER \"$(BUILD_NUMBER)\"" >> $(VERSION_HEADER)
+
+# Run `make bump_build` to manually increment and rebuild the header
+bump_build:
+	@echo $(NEXT_BUILD_NUMBER) > $(BUILD_FILE)
+	@rm -f $(VERSION_HEADER)
+	@$(MAKE) $(VERSION_HEADER) --no-print-directory
+
+# ==========================================
+# INCLUDE PATHS
+# ==========================================
+
 INCLUDES      := -I$(SRC_DIR) \
                  -I$(IMGUI_DIR) \
                  -I$(IMGUI_DIR)/backends \
@@ -28,23 +64,19 @@ INCLUDES      := -I$(SRC_DIR) \
 # --- RESOURCE COMPILER ---
 WINDRES       := windres
 RESOURCE_FILE := $(SRC_DIR)/eater.rc
-# Check if resource file exists before trying to compile it
+
 ifneq ("$(wildcard $(RESOURCE_FILE))","")
     RESOURCE_OBJ := $(BUILD_DIR)/obj/eater.res
 endif
 
 # --- LINKING ---
-# 1. Library Paths
 LDFLAGS       := -L$(VENDOR_DIR)/GLFW/lib
+LIBS          := -lglfw3 -lopengl32 -lgdi32 -lws2_32 -lmswsock -limm32 -lwinmm -static-libgcc -static-libstdc++
 
-# 2. Libraries (Static Link)
-# -static flags ensure we don't need MinGW DLLs at runtime
-LIBS          := -lglfw3 -lopengl32 -lgdi32 -lws2_32 -lmswsock -limm32 -lwinmm -static-libgcc -static-libstdc++ #-mwindows
-
-# -------------------------------------------------------------------------
+# ==========================================
 # SOURCE DISCOVERY
-# -------------------------------------------------------------------------
-# Recursive wildcard function (Works on Windows/Linux)
+# ==========================================
+# Recursive wildcard function
 rwildcard=$(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
 # 1. Project Sources (Filter out the generator tool)
@@ -58,7 +90,8 @@ VENDOR_SRCS      := $(IMGUI_DIR)/imgui.cpp \
                     $(IMGUI_DIR)/imgui_widgets.cpp \
                     $(IMGUI_DIR)/imgui_demo.cpp \
                     $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp \
-                    $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
+                    $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp \
+					$(IMGUI_DIR)/ImGuiFileDialog.cpp
 
 # 3. Object Lists
 PROJECT_OBJS := $(PROJECT_SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/obj/%.o)
@@ -72,7 +105,7 @@ DEPS := $(OBJS:.o=.d)
 # TARGETS
 # ==========================================
 
-all: $(BUILD_DIR)/$(APP_NAME) copy-dlls copy-assets copy-tools
+all: bump_build $(VERSION_HEADER) $(BUILD_DIR)/$(APP_NAME) copy-dlls copy-assets copy-tools
 
 # Link Final Executable
 $(BUILD_DIR)/$(APP_NAME): $(OBJS) $(RESOURCE_OBJ)
@@ -81,68 +114,77 @@ $(BUILD_DIR)/$(APP_NAME): $(OBJS) $(RESOURCE_OBJ)
 	@$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS) $(LIBS)
 	@echo "Build Success! Run: $(BUILD_DIR)/$(APP_NAME)"
 
-# Copy DLLs Target
-copy-dlls:
-	@echo "Copying DLLs from $(LIB_SRC_DIR) to $(BUILD_DIR)..."
-	@mkdir -p $(BUILD_DIR)
-	@if [ -d "$(LIB_SRC_DIR)" ]; then cp $(LIB_SRC_DIR)/*.dll $(BUILD_DIR)/ 2>/dev/null || :; fi
-	@echo "DLL Deployment Complete."
+# ==========================================
+# FILE DEPLOYMENT (Cross-Platform Safe)
+# ==========================================
 
-# Copy Assets
+HAS_DLLS   := $(wildcard $(LIB_SRC_DIR)/*.dll)
+HAS_ASSETS := $(wildcard $(ASSETS_DIR)/*)
+HAS_TOOLS  := $(wildcard tools/Assembler/Assembler.exe)
+
+copy-dlls:
+ifneq ($(strip $(HAS_DLLS)),)
+	@echo "Deploying DLLs..."
+	@mkdir -p $(BUILD_DIR)
+	@cp $(LIB_SRC_DIR)/*.dll $(BUILD_DIR)/ 2>/dev/null || true
+endif
+
 copy-assets:
+ifneq ($(strip $(HAS_ASSETS)),)
 	@echo "Deploying Assets..."
 	@mkdir -p $(BUILD_DIR)/assets
-	@if [ -d "$(ASSETS_DIR)" ]; then cp -r $(ASSETS_DIR)/* $(BUILD_DIR)/assets/ 2>/dev/null || :; fi
-	@echo "Assets have been Deployed..."
+	@cp -r $(ASSETS_DIR)/* $(BUILD_DIR)/assets/ 2>/dev/null || true
+endif
 
-# Copy Tools
 copy-tools:
-	@echo "Deploying Assembler..."
+ifneq ($(strip $(HAS_TOOLS)),)
+	@echo "Deploying Assembler tool..."
 	@mkdir -p $(BUILD_DIR)
-	@if [ -f "tools/Assembler/Assembler.exe" ]; then cp "tools/Assembler/Assembler.exe" $(BUILD_DIR)/; fi
-	@echo "Tools have been Deployed..."
+	@cp tools/Assembler/Assembler.exe $(BUILD_DIR)/ 2>/dev/null || true
+endif
+
+# ==========================================
+# COMPILATION RULES
+# ==========================================
 
 # Compile Project C++ Files
-$(BUILD_DIR)/obj/%.o: $(SRC_DIR)/%.cpp
+$(BUILD_DIR)/obj/%.o: $(SRC_DIR)/%.cpp $(VERSION_HEADER)
 	@echo "Compiling $<"
 	@mkdir -p $(dir $@)
 	@$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP -c $< -o $@
 
-# Compile Vendor C++ Files (ImGui)
+# Compile Vendor C++ Files (Added -MMD -MP to generate .d files)
 $(BUILD_DIR)/vendor/%.o: $(VENDOR_DIR)/%.cpp
 	@echo "Compiling Vendor $<"
 	@mkdir -p $(dir $@)
-	@$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+	@$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP -c $< -o $@
 
-# Compile Resource File (if it exists)
+# Compile Resource File
 $(BUILD_DIR)/obj/%.res: $(SRC_DIR)/%.rc
 	@echo "Compiling Resource $<"
 	@mkdir -p $(dir $@)
 	@$(WINDRES) $< -O coff -o $@
 
-# --- UTILITY COMMANDS ---
+# ==========================================
+# UTILITY COMMANDS
+# ==========================================
 
-# Run the emulator
 run: all
 	@echo "Running..."
 	@./$(BUILD_DIR)/$(APP_NAME)
 
-# Clean only project files
 clean:
 	@echo "Cleaning Project Files..."
 	@rm -rf $(BUILD_DIR)/obj
 	@rm -f $(BUILD_DIR)/$(APP_NAME)
 
-# Clean everything (including ImGui)
 clean-all:
 	@echo "Cleaning Everything..."
 	@rm -rf $(BUILD_DIR)
 
-# Debug Info
 info:
 	@echo "Project Sources: $(PROJECT_SRCS)"
 	@echo "Vendor Sources: $(VENDOR_SRCS)"
 
-.PHONY: all run clean clean-all info
-
+# Include compiler-generated dependency files
 -include $(DEPS)

@@ -1,13 +1,24 @@
+// ============================================================================
+// Copyright (c) 2026 Andrew Young
+// This software is released under the MIT License.
+// https://opensource.org/licenses/MIT
+// 
+// ============================================================================
+
+
 #include "debug_view.h"
 #include "../../driver/mainboard.h"       // Required for mb_driver->get_cpu()
 #include "../../devices/video/nhd_0216k1z.h" // Required for m_lcd->get_display_lines()
 #include "../../../vendor/imgui/imgui.h"
+#include "../../version.h"
+#include <GLFW/glfw3.h>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
 #include <cmath>
 #include <windows.h>
 #include <vector>
+#include <fstream>
 
 // We need the CPU definition to access registers (A, X, Y, PC)
 // Ensure this path matches where you put your CPU file
@@ -138,6 +149,10 @@ void DebugView::draw_menu_bar(bool& is_paused, bool& step_request) {
             if (ImGui::MenuItem("Reset CPU")) {
                 if (m_cpu) m_cpu->device_reset();
             }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Exit")){
+                glfwSetWindowShouldClose(glfwGetCurrentContext(), true);
+            }
             ImGui::EndMenu();
         }
 
@@ -217,21 +232,46 @@ void DebugView::draw_menu_bar(bool& is_paused, bool& step_request) {
 void DebugView::draw_rom_window() {
     ImGui::Begin("ROM Loader");
 
-    ImGui::Text("Load Firmware Image");
+    ImGui::Text("Load Firmware Image (.bin)");
     
     // Input Box for Filename
     ImGui::InputText("Filename", m_rom_path, 256);
     
     // Load Button
-    if (ImGui::Button("Load & Reset")) {
-        // 1. Call Driver to Load
-        if (m_driver->load_rom(m_rom_path)) {
-            // 2. Reset CPU to load new Vector
-            m_driver->reset();
-            snprintf(m_status_msg, 128, "Success: Loaded %s", m_rom_path);
-        } else {
-            snprintf(m_status_msg, 128, "Error: File not found!");
+    if (ImGui::Button("Browse & Load ROM")) {
+        IGFD::FileDialogConfig config;
+        config.path = ".";  // Starts in current directory
+
+        ImGuiFileDialog::Instance()->OpenDialog(
+            "ChooseRomDlgKey",
+            "Select a ROM",
+            ".bin,.*",
+            config
+        );
+    }
+
+    // Display the Dialog and handle the results
+    if (ImGuiFileDialog::Instance()->Display("ChooseRomDlgKey")){
+        if(ImGuiFileDialog::Instance()->IsOk()){
+            std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
+
+            if (m_driver->load_rom(filePathName.c_str())){
+                m_driver->reset();
+
+                // Log the success to your UI
+                add_log(LOG_INFO, "User loaded custom ROM: %s", filePathName.c_str());
+                snprintf(m_status_msg, sizeof(m_status_msg), "Success: Loaded custom ROM");
+            } else {
+                add_log(LOG_ERROR, "Failed to load ROM: %s", filePathName.c_str());
+                snprintf(m_status_msg, sizeof(m_status_msg), "Error: Bad ROM file");
+            }
+            // Save to the existing m_rom_path buffer for UI display
+            strncpy(m_rom_path, filePathName.c_str(), sizeof(m_rom_path) - 1);
+            m_rom_path[sizeof(m_rom_path) - 1] = '\0';         
         }
+
+        // Close the dialog regardless of OK or Cancel
+        ImGuiFileDialog::Instance()->Close();
     }
 
     // Status Message (Yellow)
@@ -455,27 +495,66 @@ void DebugView::draw_via_window() {
 }
 
 void DebugView::draw_acia_window() {
-    ImGui::Begin("ACIA (U7) - Serial");
+    ImGui::Begin("ACIA (U7) & Serial Terminal");
     
+    // Check Schematic Availability
+    if (m_driver->get_machine_type() == MachineType::SCHEMATIC_1_BASIC) {
+        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Serial Interface Disabled.");
+        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Switch to Schematic 2 to enable U7 & U8.");
+        ImGui::End();
+        return;
+    }
+
+    // Hardware Register View
     if (m_acia) {
         // W65C51 Registers: 0=Data, 1=Status, 2=Command, 3=Control
         u8 status = m_acia->read(1); // Read status (Note: might clear IRQs in some emus)
         u8 cmd    = m_acia->read(2);
         u8 ctrl   = m_acia->read(3);
 
-        ImGui::Text("Status:  %02X", status);
-        ImGui::Text("Command: %02X", cmd);
-        ImGui::Text("Control: %02X", ctrl);
-        
-        ImGui::Separator();
+        ImGui::Text("ACIA Status:  %02X | Cmd: %02X | Ctrl: %02X", status, cmd, ctrl);
         
         // Decode Status Flags
         if (status & 0x80) ImGui::TextColored(ImVec4(1,0,0,1), "IRQ Active");
         if (status & 0x10) ImGui::Text("Tx Empty");
         if (status & 0x08) ImGui::TextColored(ImVec4(0,1,0,1), "Rx Full (Data Available)");
         
-        ImGui::Separator();
-        ImGui::TextDisabled("(Serial Terminal not implemented yet)");
+    }
+    ImGui::Separator();
+
+    // Physical Serial Port View (The MAX232 / COM Port)
+    Serial_Port* port = m_driver->get_serial_port();
+    if (port) {
+        // Connection status
+        if (port->is_connected()){
+            ImGui::TextColored(ImVec4(0,1,0,1), "DB9 Cable: CONNECTED");
+        } else {
+            ImGui::TextColored(ImVec4(1,0,0,1), "DB9 Cable: DISCONNECTED");
+        }
+
+        // Data Counters & Clear Button
+        ImGui::Text("Sent: %zu bytes | Recv: %zu bytes", port->get_tx_bytes(), port->get_rx_bytes());
+        ImGui::SameLine(ImGui::GetWindowWidth() -60);
+        if (ImGui::Button("Clear")){
+            port->clear_terminal();
+        }
+
+        // The Terminal Window
+        ImGui::Text("Serial Monitor:");
+
+        // Push a darker background color for the terminal box
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+        ImGui::BeginChild("TerminalScrollRegion", ImVec2(0,150), true, ImGuiWindowFlags_HorizontalScrollbar);
+
+        // Print the captured serial data
+        ImGui::TextUnformatted(port->get_terminal_log().c_str());
+
+        // Auto-scroll to bottom if new data arrived
+        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()){
+            ImGui::SetScrollHereY(1.0f);
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
     }
     ImGui::End();
 }
@@ -692,6 +771,11 @@ void DebugView::draw_status_bar() {
     
     if (ImGui::Begin("##StatusBar", nullptr, flags)) {
         ImGui::TextUnformatted(m_status_message.c_str());
+
+        // --- Version Display ---
+        ImGui::SameLine(ImGui::GetWindowWidth() -250);
+        ImGui::TextDisabled("Version %s (Build %s)", APP_VERSION, APP_BUILD_NUMBER);
+
         ImGui::End();
     }
     ImGui::PopStyleColor();
@@ -702,7 +786,12 @@ void DebugView::draw_status_bar() {
         if (m_status_timer <= 0) {
             m_status_message = "Ready";
         }
+        else {
+            m_status_message = "Not Ready";
+        }
     }
+
+    
 }
 
 void DebugView::draw_log_window() {
@@ -752,4 +841,47 @@ void DebugView::draw_byte_header(int columns, const char* padding) {
         ImGui::TextColored(ImVec4(1, 1, 0, 1), "%02X", i);
     }
     ImGui::Separator();
+}
+
+
+// ============================================================================
+// File Loading Implementation
+// ============================================================================
+void DebugView::load_rom(const char* filepath) {
+    // Open the file at the end to quickly get its size
+    std::fstream file(filepath, std::ios::binary | std::ios::ate);
+
+    if (!file.is_open()){
+        snprintf(m_status_msg, sizeof(m_status_msg), "Error: Could not open file!");
+        add_log(LOG_ERROR, "Failed to open ROM file: %s", filepath);
+        return;
+    }
+
+    // Get file size and rewind to the beginning
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    if (size <= 0) {
+        snprintf(m_status_msg, sizeof(m_status_msg), "Error: File is empty!");
+        add_log(LOG_ERROR, "ROM file is empty: %s", filepath);
+        return;
+    }
+
+    // Read the binary data into a vector
+    std::vector<u8> rom_buffer(size);
+    if (file.read(reinterpret_cast<char*>(rom_buffer.data()), size)){
+
+        // Update the UI status and system Log
+        snprintf(m_status_msg, sizeof(m_status_msg), "Success: Loaded %s", filepath);
+        add_log(LOG_INFO, "Loaded %d bytes from %s", (int)size, filepath);
+
+        // Pass data to the emulator driver and reset
+        if (m_driver->load_rom(filepath)){
+            m_driver->reset();
+            add_log(LOG_INFO, "System reset triggered after ROM load.");
+        }
+    } else {
+        snprintf(m_status_msg, sizeof(m_status_msg), "Error: Failed to read data!");
+        add_log(LOG_ERROR, "System read failure on ROM: %s", filepath);
+    }
 }

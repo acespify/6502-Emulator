@@ -1,3 +1,9 @@
+// ============================================================================
+// Copyright (c) 2026 Andrew Young
+// This software is released under the MIT License.
+// https://opensource.org/licenses/MIT
+// 
+// ============================================================================
 //======================================================================================
 //  This file is the base class for the eater6502 emulator being developed as a 
 //  tutorial for a youtube video on "How to create a MAME Style" emulator.

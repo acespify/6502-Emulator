@@ -1,3 +1,10 @@
+// ============================================================================
+// Copyright (c) 2026 Andrew Young
+// This software is released under the MIT License.
+// https://opensource.org/licenses/MIT
+// 
+// ============================================================================
+
 #ifndef DEBUG_VIEW_H
 #define DEBUG_VIEW_H
 
@@ -6,6 +13,9 @@
 #include <string>
 #include <vector>
 #include <cstdarg>
+
+#include "../../../vendor/imgui/ImGuiFileDialog.h"
+#include "../../../vendor/imgui/ImGuiFileDialogConfig.h"
 
 // ============================================================================
 // Forward Declarations
@@ -42,6 +52,7 @@ public:
     static bool m_enable_trace; // Static boolean to toggle from the UI
     static bool m_en_cpu_trace; // Static boolean to trace the cpu instructions
 
+    void load_rom(const char* filepath);
 private:
     // ----- Hardware Pointers -----
     mb_driver* m_driver;

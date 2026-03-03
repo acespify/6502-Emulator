@@ -1,3 +1,11 @@
+// ============================================================================
+// Copyright (c) 2026 Andrew Young
+// This software is released under the MIT License.
+// https://opensource.org/licenses/MIT
+// 
+// ============================================================================
+
+
 #pragma once
 #include "../../emu/di_memory.h"
 #include <functional>
@@ -9,6 +17,8 @@
 class w65c51 : public device_memory_interface {
 public:
     w65c51();
+
+    void reset();
 
     // --- CPU Interface ---
     u8 read(u16 addr);
@@ -30,12 +40,12 @@ public:
 private:
     // Registers
     u8 m_data_reg;
-    u8 m_status_reg;  // Bits: 7=IRQ, 4=RxFull, 1=TxEmpty
-    u8 m_command_reg; // Controls IRQ enables
+    u8 m_status_reg;  // Bits: 7=IRQ, 4=TxEmpty 3=RxFull,
     u8 m_control_reg; // Baud rate (ignored in emulation)
+    u8 m_command_reg;
 
-    std::queue<u8> m_tx_buffer; // Outgoing (to PC)
-    u8 m_rx_buffer;             // Incoming (from PC)
+    std::queue<u8> m_tx_buffer; // Outgoing (to PC) (Tx_Data)
+    u8 m_rx_buffer;             // Incoming (from PC) (Rx_Data)
 
     irq_callback m_irq_cb;
     void update_irq();

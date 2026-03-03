@@ -1,3 +1,10 @@
+// ============================================================================
+// Copyright (c) 2026 Andrew Young
+// This software is released under the MIT License.
+// https://opensource.org/licenses/MIT
+// 
+// ============================================================================
+
 #include "nhd_0216k1z.h"
 #include "ui/views/debug_view.h"
 #include <algorithm>

@@ -1,3 +1,10 @@
+// ============================================================================
+// Copyright (c) 2026 Andrew Young
+// This software is released under the MIT License.
+// https://opensource.org/licenses/MIT
+// 
+// ============================================================================
+
 #include "62256.h"
 #include "../../emu/map.h"
 

@@ -1,3 +1,10 @@
+// ============================================================================
+// Copyright (c) 2026 Andrew Young
+// This software is released under the MIT License.
+// https://opensource.org/licenses/MIT
+// 
+// ============================================================================
+
 #include "w65c51.h"
 #include "../../emu/map.h"
 
@@ -5,7 +12,7 @@
 enum { DATA = 0, STATUS = 1, COMMAND = 2, CONTROL = 3 };
 
 w65c51::w65c51() {
-    m_status_reg = 0x10; // Default: Tx Empty (Bit 4 is Rx Full, 0 initially)
+    reset();
 }
 
 void w65c51::memory_map(address_map& map) {
@@ -15,6 +22,21 @@ void w65c51::memory_map(address_map& map) {
     );
 }
 
+void w65c51::reset() {
+    m_command_reg   = 0x00;
+    m_control_reg   = 0x00;
+    m_status_reg    = 0x10;
+    m_rx_buffer     = 0x00;
+
+    // Need to clear out any stale transmitted bytes
+    while(!m_tx_buffer.empty()) m_tx_buffer.pop();
+
+    update_irq();
+}
+
+// ============================================================================
+// ACIA READ LOGIC
+// ============================================================================
 u8 w65c51::read(u16 addr) {
     switch (addr & 0x03) {
         case DATA:
@@ -22,9 +44,10 @@ u8 w65c51::read(u16 addr) {
             m_status_reg &= ~0x08; // Clear Bit 3 (Rx Full) - W65C51 specific bit pos
             // Note: Older 6551 used Bit 3 for Rx Full, W65C51 might vary. 
             // Standard 6551: Bit 3 = Rx Full, Bit 4 = Tx Empty.
+            m_status_reg &= ~0x80;
             update_irq();
             return m_rx_buffer;
-        
+            break;
         case STATUS:
             // Reading Status clears IRQ bit (Bit 7) on some versions
             {
@@ -33,9 +56,9 @@ u8 w65c51::read(u16 addr) {
                 update_irq();
                 return res;
             }
-        
-        case COMMAND: return m_command_reg;
-        case CONTROL: return m_control_reg;
+            break;
+        case COMMAND: return m_command_reg; break;
+        case CONTROL: return m_control_reg; break;
     }
     return 0;
 }
@@ -52,7 +75,9 @@ void w65c51::write(u16 addr, u8 data) {
 
         case STATUS: 
             // Soft Reset
-            m_status_reg = 0x10; 
+            m_command_reg = 0x00;
+            m_status_reg = ~0x80; 
+            update_irq();
             break;
             
         case COMMAND: m_command_reg = data; update_irq(); break;
@@ -71,4 +96,16 @@ void w65c51::update_irq() {
     // If IRQ Flag (Bit 7) is Set AND Command Reg Bit 1 is LOW (IRQ Enabled)
     bool irq_active = (m_status_reg & 0x80) && !(m_command_reg & 0x02);
     if (m_irq_cb) m_irq_cb(irq_active);
+}
+
+bool w65c51::has_tx_data() {
+    return !m_tx_buffer.empty();
+}
+
+u8 w65c51::pop_tx_data() {
+    if (m_tx_buffer.empty()) return 0;
+
+    u8 data = m_tx_buffer.front();
+    m_tx_buffer.pop();
+    return data;
 }

@@ -1,3 +1,10 @@
+// ============================================================================
+// Copyright (c) 2026 Andrew Young
+// This software is released under the MIT License.
+// https://opensource.org/licenses/MIT
+// 
+// ============================================================================
+
 #pragma once
 #include "../emu/machine.h"
 #include "../devices/cpu/m6502.h"
@@ -7,6 +14,9 @@
 #include "../devices/io/w65c51.h"
 #include "../devices/video/nhd_0216k1z.h"
 #include "../devices/logic/74hc00.h"
+
+#include "../devices/io/serial_port.h"
+
 
 // ============================================================================
 // Hardware variants
@@ -37,6 +47,7 @@ public:
     w65c22* get_via() override { return &m_via; }
     w65c51* get_acia() override { return &m_acia; }
     nhd_0216k1z* get_lcd() { return &m_lcd; }
+    Serial_Port* get_serial_port() { return m_serial_port; }
 
     bool load_rom(const char* filename) {
         std::cout << "[Driver] Attempting to load ROM from: " << filename << std::endl;
@@ -62,6 +73,9 @@ private:
     w65c22        m_via; // U5 
     w65c51        m_acia; // U7 (ACIA)
     nhd_0216k1z   m_lcd; // U3 (LCD)
+
+    // the emulation of the MAX232 sort of
+    Serial_Port* m_serial_port = nullptr;
 
     u8   m_port_b_data = 0x00;
     bool m_last_e_state = false;    // To detect the edge of the Enable pin
