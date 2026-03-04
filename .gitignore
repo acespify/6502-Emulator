@@ -4,6 +4,7 @@
 # Ignore build folder and .vscode file
 .vscode/
 build/
+assets/release/
 
 
 # Ignore rom-generator and rom.bin

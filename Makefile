@@ -68,7 +68,8 @@ INCLUDES      := -I$(SRC_DIR) \
                  -I$(VENDOR_DIR)/glfw/include \
                  -I$(VENDOR_DIR) \
                  -I$(VENDOR_DIR)/stb_image \
-                 -I$(VENDOR_DIR)/asio/include
+                 -I$(VENDOR_DIR)/asio/include \
+				 -I$(VENDOR_DIR)/json
 
 # --- LINKING ---
 LDFLAGS       := -L$(VENDOR_DIR)/GLFW/lib

@@ -35,11 +35,13 @@ struct LogEntry {
     LogType type;
 };
 
+struct EmulatorConfig;
+
 class DebugView {
 public:
     // Constructor: We pass pointers to hardware. 
     // If a device isn't ready, pass 'nullptr'.
-    DebugView(mb_driver* driver);
+    DebugView(mb_driver* driver, EmulatorConfig* config);
 
     // Main Draw Loop (Called every frame by Renderer)
     void draw(bool& is_paused, bool& step_request);
@@ -56,6 +58,7 @@ public:
 private:
     // ----- Hardware Pointers -----
     mb_driver* m_driver;
+    EmulatorConfig* m_config;
     m6502_p* m_cpu;
     w65c22* m_via;
     w65c51* m_acia;
@@ -74,7 +77,7 @@ private:
     int m_target_hz = 1000000;
 
     // --- Window Visibility Flags ---
-    bool m_show_cpu         = true;
+   /* bool m_show_cpu         = true;
     bool m_show_stack       = true;
     bool m_show_via         = false;
     bool m_show_acia        = false;
@@ -82,9 +85,9 @@ private:
     bool m_show_lcd         = true;
     bool m_show_rom         = false;
     bool m_show_speed       = false;
+    
+    bool m_show_log         = true;*/
     bool m_show_status_bar  = true;
-    bool m_show_log         = true;
-
     // --- Helper Functions ---
     void LaunchAssembler();
     void draw_menu_bar(bool& is_paused, bool& step_request);

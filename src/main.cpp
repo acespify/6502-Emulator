@@ -18,6 +18,7 @@
 
 // Hardware Includes
 #include "driver/mainboard.h"
+#include "config.h"
 
 // ============================================================================
 // 4. MAIN ENTRY POINT
@@ -36,6 +37,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     // This runs the internal init(), loads the ROM, and wires the schematic.
     mb_driver computer;
     computer.init();
+
+    // Load Config & Apply Schematic
+    EmulatorConfig app_config;
+    app_config.load("emulator_config.json");
+    computer.set_machine_type((MachineType)app_config.machine_type);
     computer.reset();
 
     // 3. Setup Debugger
@@ -44,7 +50,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     bool step_req = false;
     
     // Note: We now pass the LCD pointer too! You might need to update DebugView constructor later.
-    DebugView debugger(&computer);
+    DebugView debugger(&computer, &app_config);
 
     // Timing Variables
     // Target: 60FPS (16.66ms per frame)
@@ -106,6 +112,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         }
     }
     std::cerr << "Main Loop Exited." << std::endl;
+    // Shutdown config
+    app_config.save("emulator_config.json");
     renderer.shutdown();
     return 0;
 }

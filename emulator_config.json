@@ -1,0 +1,12 @@
+{
+    "machine_type": 0,
+    "show_acia": false,
+    "show_cpu": true,
+    "show_lcd": true,
+    "show_log": true,
+    "show_ram": true,
+    "show_rom": true,
+    "show_speed": false,
+    "show_stack": true,
+    "show_via": true
+}

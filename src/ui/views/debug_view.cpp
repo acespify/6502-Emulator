@@ -23,6 +23,7 @@
 // We need the CPU definition to access registers (A, X, Y, PC)
 // Ensure this path matches where you put your CPU file
 #include "devices/cpu/m6502.h" 
+#include "../../config.h"
 
 bool DebugView::m_enable_trace = false;
 bool DebugView::m_en_cpu_trace = false;
@@ -55,7 +56,7 @@ void DebugView::LaunchAssembler() {
     std::string dir = (pos != std::string::npos) ? path.substr(0, pos) : "";
 
     // Build the full path to the assembler in the same directory
-    std::string assembler_path = dir + "\\Assembler.exe";
+    std::string assembler_path = dir + "\\..\\assets\\release\\Assembler.exe";
 
     // 3. Prepare Win32 Startup structures
     STARTUPINFOA si;
@@ -94,8 +95,8 @@ void DebugView::LaunchAssembler() {
 //  WHEN: Created by the main application (Renderer) at startup.
 //  WHY:  Stores the pointers to the hardware devices so we can read their state later.
 // ============================================================================
-DebugView::DebugView(mb_driver* driver)
-    : m_driver(driver) 
+DebugView::DebugView(mb_driver* driver, EmulatorConfig* config)
+    : m_driver(driver), m_config(config)
 {
     // Extract pointers for easy access
     m_cpu = driver->get_cpu();
@@ -117,16 +118,16 @@ void DebugView::draw(bool& is_paused, bool& step_request) {
     draw_menu_bar(is_paused, step_request);
 
     // 2. Draw Windows (if enabled)
-    if (m_show_cpu)         draw_cpu_window(is_paused, step_request);
-    if (m_show_stack)       draw_stack_smart();
-    if (m_show_via)         draw_via_window();
-    if (m_show_acia)        draw_acia_window();
-    if (m_show_ram)         draw_memory_window();
-    if (m_show_lcd)         draw_lcd_window();
-    if (m_show_rom)         draw_rom_window();
-    if (m_show_speed)       draw_speed_control();
-    if (m_show_status_bar)  draw_status_bar();
-    if (m_show_log)         draw_log_window();
+    if (m_config->show_cpu)         draw_cpu_window(is_paused, step_request);
+    if (m_config->show_stack)       draw_stack_smart();
+    if (m_config->show_via)         draw_via_window();
+    if (m_config->show_acia)        draw_acia_window();
+    if (m_config->show_ram)         draw_memory_window();
+    if (m_config->show_lcd)         draw_lcd_window();
+    if (m_config->show_rom)         draw_rom_window();
+    if (m_config->show_speed)       draw_speed_control();
+    if (m_show_status_bar)          draw_status_bar();
+    if (m_config->show_log)         draw_log_window();
 }
 
 // ============================================================================
@@ -158,14 +159,14 @@ void DebugView::draw_menu_bar(bool& is_paused, bool& step_request) {
 
         // Window Toggles
         if (ImGui::BeginMenu("View")) {
-            ImGui::MenuItem("CPU Registers", nullptr, &m_show_cpu);
-            ImGui::MenuItem("Stack Viewer",  nullptr, &m_show_stack);
-            ImGui::MenuItem("VIA (U5)",      nullptr, &m_show_via);
-            ImGui::MenuItem("ACIA (U7)",     nullptr, &m_show_acia);
-            ImGui::MenuItem("Memory Dump",   nullptr, &m_show_ram);
-            ImGui::MenuItem("Rom",           nullptr, &m_show_rom);
-            ImGui::MenuItem("LCD Display",   nullptr, &m_show_lcd);
-            ImGui::MenuItem("Speed Control", nullptr, &m_show_speed);
+            ImGui::MenuItem("CPU Registers", nullptr, &m_config->show_cpu);
+            ImGui::MenuItem("Stack Viewer",  nullptr, &m_config->show_stack);
+            ImGui::MenuItem("VIA (U5)",      nullptr, &m_config->show_via);
+            ImGui::MenuItem("ACIA (U7)",     nullptr, &m_config->show_acia);
+            ImGui::MenuItem("Memory Dump",   nullptr, &m_config->show_ram);
+            ImGui::MenuItem("Rom",           nullptr, &m_config->show_rom);
+            ImGui::MenuItem("LCD Display",   nullptr, &m_config->show_lcd);
+            ImGui::MenuItem("Speed Control", nullptr, &m_config->show_speed);
             ImGui::EndMenu();
         }
 
@@ -195,7 +196,7 @@ void DebugView::draw_menu_bar(bool& is_paused, bool& step_request) {
                     LaunchExternal("x-terminal-emulator");
                 #endif
             }*/
-           ImGui::MenuItem("Debug View Log", nullptr, &m_show_log);
+           ImGui::MenuItem("Debug View Log", nullptr, &m_config->show_log);
             // 6502 Assembler studio
             if (ImGui::MenuItem("6502 Assembler Studio")){
                 LaunchAssembler();
@@ -360,7 +361,11 @@ void DebugView::draw_cpu_window(bool& is_paused, bool& step_request) {
             m_driver->set_machine_type((MachineType)current_idx);
             
             // Force pause so we don't crash running old code on new hardware
-            is_paused = true; 
+            is_paused = true;
+            
+            m_config->machine_type = current_idx;
+            m_config->apply_schematic_rules();
+            m_config->save("emulator_config.json");
         }
         
         if (current_idx == 1) {
@@ -495,7 +500,7 @@ void DebugView::draw_via_window() {
 }
 
 void DebugView::draw_acia_window() {
-    ImGui::Begin("ACIA (U7) & Serial Terminal");
+    ImGui::Begin("ACIA (U7) & Serial Terminal", &m_config->show_acia);
     
     // Check Schematic Availability
     if (m_driver->get_machine_type() == MachineType::SCHEMATIC_1_BASIC) {
@@ -540,21 +545,22 @@ void DebugView::draw_acia_window() {
         }
 
         // The Terminal Window
-        ImGui::Text("Serial Monitor:");
+        if (ImGui::CollapsingHeader("Serial Monitor:", ImGuiTreeNodeFlags_None)){
 
-        // Push a darker background color for the terminal box
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
-        ImGui::BeginChild("TerminalScrollRegion", ImVec2(0,150), true, ImGuiWindowFlags_HorizontalScrollbar);
+            // Push a darker background color for the terminal box
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+            ImGui::BeginChild("TerminalScrollRegion", ImVec2(0,150), true, ImGuiWindowFlags_HorizontalScrollbar);
 
-        // Print the captured serial data
-        ImGui::TextUnformatted(port->get_terminal_log().c_str());
+            // Print the captured serial data
+            ImGui::TextUnformatted(port->get_terminal_log().c_str());
 
-        // Auto-scroll to bottom if new data arrived
-        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()){
-            ImGui::SetScrollHereY(1.0f);
+            // Auto-scroll to bottom if new data arrived
+            if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()){
+                ImGui::SetScrollHereY(1.0f);
+            }
+            ImGui::EndChild();
+            ImGui::PopStyleColor();
         }
-        ImGui::EndChild();
-        ImGui::PopStyleColor();
     }
     ImGui::End();
 }
@@ -795,10 +801,10 @@ void DebugView::draw_status_bar() {
 }
 
 void DebugView::draw_log_window() {
-    if (!m_show_log) return;
+    if (!m_config->show_log) return;
 
     ImGui::SetNextWindowSize(ImVec2(500, 400), ImGuiCond_FirstUseEver);
-    if (ImGui::Begin("System Log", &m_show_log)){
+    if (ImGui::Begin("System Log", &m_config->show_log)){
         if(ImGui::Button("Clear")) m_logs.clear();
         ImGui::SameLine();
         if (ImGui::Button("Copy to Clipboard")) { /* ... */}
