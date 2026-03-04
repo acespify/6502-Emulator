@@ -5,6 +5,7 @@
 .vscode/
 build/
 assets/release/
+source/
 
 
 # Ignore rom-generator and rom.bin
