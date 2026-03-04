@@ -4,33 +4,42 @@
 
 APP_NAME      := eater.exe
 CXX           := g++
-CXXFLAGS      := -std=c++17 -g -Wall -Wextra -D_WIN32_WINNT=0x0A00
+CXXFLAGS      := -std=c++17 -Wall -Wextra -D_WIN32_WINNT=0x0A00 -MMD -MP
 
 # Directories
-BUILD_DIR     := build
 SRC_DIR       := src
 LIB_SRC_DIR   := libs
 ASSETS_DIR    := assets
 VENDOR_DIR    := vendor
 IMGUI_DIR     := $(VENDOR_DIR)/imgui
 
-.DEFAULT_GOAL := all
+BUILD_DIR     := build
+TEST_DIR	  := $(BUILD_DIR)/test
+RELEASE_DIR	  := $(BUILD_DIR)/release
 
-.PHONY: all run clean clean-all info copy-dlls copy-assets copy-tools bump_build
+.DEFAULT_GOAL := all
+.PHONY: all test release run run-test run-release clean clean-test clean-release clean-all info copy-dlls copy-assets copy-tools bump_build
 
 # ==========================================
 # VERSIONING SYSTEM
 # ==========================================
 
-VERSION      := 0.1.0
+# Define the base semantic versioning
+VERSION_MAJOR	:= 0
+VERSION_MINOR	:= 1
+
 GIT_HASH     := $(shell git rev-parse --short HEAD 2>/dev/null || echo "nogit")
 BUILD_DATE   := $(shell date +"%Y-%m-%d %H:%M:%S")
 BUILD_FILE   := build_number.txt
 BUILD_NUMBER := $(shell [ -f $(BUILD_FILE) ] && cat $(BUILD_FILE) || echo 0)
 
+# Calculate the Patch version (integer by 10)
+VERSION_PATCH	:= $(shell expr $(BUILD_NUMBER) / 10)
+
+VERSION      := $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)
+
 # Calculate the next number safely, avoiding Windows shell math bugs
 NEXT_BUILD_NUMBER := $(shell expr $(BUILD_NUMBER) + 1)
-
 VERSION_HEADER := $(SRC_DIR)/version.h
 
 # Generate version.h ONLY if it doesn't exist (Preserves incremental builds!)
@@ -61,17 +70,18 @@ INCLUDES      := -I$(SRC_DIR) \
                  -I$(VENDOR_DIR)/stb_image \
                  -I$(VENDOR_DIR)/asio/include
 
+# --- LINKING ---
+LDFLAGS       := -L$(VENDOR_DIR)/GLFW/lib
+LIBS          := -lglfw3 -lopengl32 -lgdi32 -lws2_32 -lmswsock -limm32 -lwinmm -static-libgcc -static-libstdc++
+
 # --- RESOURCE COMPILER ---
 WINDRES       := windres
 RESOURCE_FILE := $(SRC_DIR)/eater.rc
 
 ifneq ("$(wildcard $(RESOURCE_FILE))","")
-    RESOURCE_OBJ := $(BUILD_DIR)/obj/eater.res
+	RESOURCE_OBJ_T := $(TEST_DIR)/obj/eater.res
+    RESOURCE_OBJ_R := $(BUILD_DIR)/obj/eater.res
 endif
-
-# --- LINKING ---
-LDFLAGS       := -L$(VENDOR_DIR)/GLFW/lib
-LIBS          := -lglfw3 -lopengl32 -lgdi32 -lws2_32 -lmswsock -limm32 -lwinmm -static-libgcc -static-libstdc++
 
 # ==========================================
 # SOURCE DISCOVERY
@@ -98,21 +108,79 @@ PROJECT_OBJS := $(PROJECT_SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/obj/%.o)
 VENDOR_OBJS  := $(VENDOR_SRCS:$(VENDOR_DIR)/%.cpp=$(BUILD_DIR)/vendor/%.o)
 
 # Combined Objects
-OBJS := $(PROJECT_OBJS) $(VENDOR_OBJS)
-DEPS := $(OBJS:.o=.d)
+TEST_OBJS		:= $(PROJECT_SRCS:$(SRC_DIR)/%.cpp=$(TEST_DIR)/obj/%.o) \
+				   $(VENDOR_SRCS:$(VENDOR_DIR)/%.cpp=$(TEST_DIR)/vendor/%.o)
+
+RELEASE_OBJS    := $(PROJECT_SRCS:$(SRC_DIR)/%.cpp=$(RELEASE_DIR)/obj/%.o) \
+				   $(VENDOR_SRCS:$(VENDOR_DIR)/%.cpp=$(RELEASE_DIR)/obj/%.o)
+
+DEPS			:= $(TEST_OBJS:.o=.d) $(RELEASE_OBJS:.o=.d)
 
 # ==========================================
 # TARGETS
 # ==========================================
 
-all: bump_build $(VERSION_HEADER) $(BUILD_DIR)/$(APP_NAME) copy-dlls copy-assets copy-tools
+all: test
 
-# Link Final Executable
-$(BUILD_DIR)/$(APP_NAME): $(OBJS) $(RESOURCE_OBJ)
-	@echo "Linking $(APP_NAME)..."
+# ----------------- TEST BUILD -----------------
+test: CXXFLAGS += -g -O0 -DDEBUG
+test: bump_build $(VERSION_HEADER) copy-dlls copy-assets copy-tools $(TEST_DIR)/$(APP_NAME)
+	@echo "Test build complete -> $(TEST_DIR)/$(APP_NAME)"
+
+$(TEST_DIR)/$(APP_NAME): $(TEST_OBJS) $(RESOURCE_OBJ_T)
+	@echo "Linking Test $(APP_NAME)..."
 	@mkdir -p $(dir $@)
 	@$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS) $(LIBS)
-	@echo "Build Success! Run: $(BUILD_DIR)/$(APP_NAME)"
+
+# ---------------- RELEASE BUILD ---------------
+release: CXXFLAGS += -O3 -DNDEBUG
+release: bump_build $(VERSION_HEADER) copy-dlls copy-assets copy-tools $(RELEASE_DIR)/$(APP_NAME)
+	@echo "Release build complete -> $(RELEASE_DIR)/$(APP_NAME)"
+
+$(RELEASE_DIR)/$(APP_NAME): $(RELEASE_OBJS) $(RESOURCE_OBJ_R)
+	@echo "Linking Release $(APP_NAME)..."
+	@mkdir -p $(dir $@)
+	@$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS) $(LIBS)
+
+# ==========================================
+# COMPILATION RULES
+# ==========================================
+
+# Compile Project C++ Files (TEST)
+$(TEST_DIR)/obj/%.o: $(SRC_DIR)/%.cpp $(VERSION_HEADER)
+	@echo "Compiling Test $<"
+	@mkdir -p $(dir $@)
+	@$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+
+# Compile Project C++ Files (RELEASE)
+$(RELEASE_DIR)/obj/%.o: $(SRC_DIR)/%.cpp $(VERSION_HEADER)
+	@echo "Compiling Release $<"
+	@mkdir -p $(dir $@)
+	@$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+
+# Compile Vendor C++ Files (TEST)
+$(TEST_DIR)/vendor/%.o: $(VENDOR_DIR)/%.cpp
+	@echo "Compiling Test Vendor $<"
+	@mkdir -p $(dir $@)
+	@$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+
+# Compile Vendor C++ Files (RELEASE)
+$(RELEASE_DIR)/vendor/%.o: $(VENDOR_DIR)/%.cpp
+	@echo "Compiling Release Vendor $<"
+	@mkdir -p $(dir $@)
+	@$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+
+# Compile Resource File (TEST)
+$(TEST_DIR)/obj/%.res: $(SRC_DIR)/%.rc
+	@echo "Compiling Resource $<"
+	@mkdir -p $(dir $@)
+	@$(WINDRES) $< -O coff -o $@
+
+# Compile Resource File (RELEASE)
+$(RELEASE_DIR)/obj/%.res: $(SRC_DIR)/%.rc
+	@echo "Compiling Resource $<"
+	@mkdir -p $(dir $@)
+	@$(WINDRES) $< -O coff -o $@
 
 # ==========================================
 # FILE DEPLOYMENT (Cross-Platform Safe)
@@ -144,47 +212,40 @@ ifneq ($(strip $(HAS_TOOLS)),)
 endif
 
 # ==========================================
-# COMPILATION RULES
-# ==========================================
-
-# Compile Project C++ Files
-$(BUILD_DIR)/obj/%.o: $(SRC_DIR)/%.cpp $(VERSION_HEADER)
-	@echo "Compiling $<"
-	@mkdir -p $(dir $@)
-	@$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP -c $< -o $@
-
-# Compile Vendor C++ Files (Added -MMD -MP to generate .d files)
-$(BUILD_DIR)/vendor/%.o: $(VENDOR_DIR)/%.cpp
-	@echo "Compiling Vendor $<"
-	@mkdir -p $(dir $@)
-	@$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP -c $< -o $@
-
-# Compile Resource File
-$(BUILD_DIR)/obj/%.res: $(SRC_DIR)/%.rc
-	@echo "Compiling Resource $<"
-	@mkdir -p $(dir $@)
-	@$(WINDRES) $< -O coff -o $@
-
-# ==========================================
 # UTILITY COMMANDS
 # ==========================================
 
-run: all
-	@echo "Running..."
-	@./$(BUILD_DIR)/$(APP_NAME)
+# Default run points to test
+run: run-test
 
-clean:
-	@echo "Cleaning Project Files..."
-	@rm -rf $(BUILD_DIR)/obj
-	@rm -f $(BUILD_DIR)/$(APP_NAME)
+run-test: test
+	@echo "Running Test Build..."
+	@./$(TEST_DIR)/$(APP_NAME)
+
+run-release: release
+	@echo "Running Release Build..."
+	@./$(RELEASE_DIR)/$(APP_NAME)
+
+# Default clean clears both targets safely without wiping the whole build folder
+clean: clean-test clean-release
+
+clean-test:
+	@echo "Cleaning Test Files..."
+	@rm -rf $(TEST_DIR)/obj $(TEST_DIR)/vendor
+	@rm -f $(TEST_DIR)/$(APP_NAME)
+
+clean-release:
+	@echo "Cleaning Release Files..."
+	@rm -rf $(RELEASE_DIR)/obj $(RELEASE_DIR)/vendor
+	@rm -f $(RELEASE_DIR)/$(APP_NAME)
 
 clean-all:
-	@echo "Cleaning Everything..."
+	@echo "Cleaning Everything (Wiping Build Directory)..."
 	@rm -rf $(BUILD_DIR)
 
 info:
 	@echo "Project Sources: $(PROJECT_SRCS)"
-	@echo "Vendor Sources: $(VENDOR_SRCS)"
+	@echo "Vendor Sources:  $(VENDOR_SRCS)"
 
 # Include compiler-generated dependency files
 -include $(DEPS)
