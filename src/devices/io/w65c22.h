@@ -23,6 +23,8 @@ public:
     virtual ~w65c22() = default;
 
     // Register Offsets (for readability)
+    // These registers are defined from the w65c22 
+    // function description, definned here for readability.
     enum Regs {
         ORB = 0, ORA = 1, DDRB = 2, DDRA = 3,
         T1CL = 4, T1CH = 5, T1LL = 6, T1LH = 7,
