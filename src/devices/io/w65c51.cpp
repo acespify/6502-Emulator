@@ -26,7 +26,7 @@ void w65c51::reset() {
     m_command_reg   = 0x00;
     m_control_reg   = 0x00;
     m_status_reg    = 0x10;
-    m_rx_buffer     = 0x00;
+    //m_rx_buffer.empty();
 
     // Need to clear out any stale transmitted bytes
     while(!m_tx_buffer.empty()) m_tx_buffer.pop();
@@ -39,14 +39,27 @@ void w65c51::reset() {
 // ============================================================================
 u8 w65c51::read(u16 addr) {
     switch (addr & 0x03) {
-        case DATA:
-            // Reading Data clears Rx Full flag
-            m_status_reg &= ~0x08; // Clear Bit 3 (Rx Full) - W65C51 specific bit pos
-            // Note: Older 6551 used Bit 3 for Rx Full, W65C51 might vary. 
-            // Standard 6551: Bit 3 = Rx Full, Bit 4 = Tx Empty.
-            m_status_reg &= ~0x80;
-            update_irq();
-            return m_rx_buffer;
+        case DATA: {
+            // create a variable to store the data coming in
+            u8 val = 0;
+            // Lets make sure the receive buffer is not empty
+            if (!m_rx_buffer.empty()){
+                // store the the oldest character
+                val = m_rx_buffer.front();
+                m_rx_buffer.pop();      // Remove it from the queue.
+            }
+
+            // Here we are only clearing the interrupt flags if the queue is completely empty
+            if (m_rx_buffer.empty()){
+                // Reading Data clears Rx Full flag
+                m_status_reg &= ~0x08; // Clear Bit 3 (Rx Full) - W65C51 specific bit pos
+                // Note: Older 6551 used Bit 3 for Rx Full, W65C51 might vary. 
+                // Standard 6551: Bit 3 = Rx Full, Bit 4 = Tx Empty.
+                m_status_reg &= ~0x80;
+            }
+            update_irq();   // Update the IRQ 
+            return val;     // return the value from the receive buffer
+        }    
             break;
         case STATUS:
             // Reading Status clears IRQ bit (Bit 7) on some versions
@@ -66,7 +79,7 @@ u8 w65c51::read(u16 addr) {
 u8 w65c51::peek(u16 addr) {
     // Need to just return the raw variables without clearing any flags
     switch (addr & 0x03) {
-        case DATA:  return m_rx_buffer;
+        case DATA:  if (!m_rx_buffer.empty()) {return m_rx_buffer.front(); } return 0;
         case STATUS: return m_status_reg;
         case COMMAND: return m_command_reg;
         case CONTROL: return m_control_reg;
@@ -87,7 +100,7 @@ void w65c51::write(u16 addr, u8 data) {
         case STATUS: 
             // Soft Reset
             m_command_reg = 0x00;
-            m_status_reg = ~0x80; 
+            m_status_reg &= ~0x80; 
             update_irq();
             break;
             
@@ -97,7 +110,7 @@ void w65c51::write(u16 addr, u8 data) {
 }
 
 void w65c51::rx_char(u8 c) {
-    m_rx_buffer = c;
+    m_rx_buffer.push(c);  // Created the rx_buffer as a queue giving access to push.
     m_status_reg |= 0x08; // Set Rx Full (Bit 3)
     m_status_reg |= 0x80; // Set IRQ Flag (Bit 7)
     update_irq();

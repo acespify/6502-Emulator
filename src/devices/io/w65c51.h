@@ -47,8 +47,9 @@ private:
     u8 m_control_reg; // Baud rate (ignored in emulation)
     u8 m_command_reg;
 
+    // These are do assist in the protections from windows
     std::queue<u8> m_tx_buffer; // Outgoing (to PC) (Tx_Data)
-    u8 m_rx_buffer;             // Incoming (from PC) (Rx_Data)
+    std::queue<u8> m_rx_buffer; // Incoming (from PC) (Rx_Data)
 
     irq_callback m_irq_cb;
     void update_irq();
