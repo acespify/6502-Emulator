@@ -63,6 +63,17 @@ u8 w65c51::read(u16 addr) {
     return 0;
 }
 
+u8 w65c51::peek(u16 addr) {
+    // Need to just return the raw variables without clearing any flags
+    switch (addr & 0x03) {
+        case DATA:  return m_rx_buffer;
+        case STATUS: return m_status_reg;
+        case COMMAND: return m_command_reg;
+        case CONTROL: return m_control_reg;
+    }
+    return 0; // returning 0 will adjust if needed.
+}
+
 void w65c51::write(u16 addr, u8 data) {
     switch (addr & 0x03) {
         case DATA:

@@ -25,6 +25,9 @@ public:
     void write(u16 addr, u8 data);
     void memory_map(address_map& map) override;
 
+    // Creating a way to just read the data received without interfering with the process
+    u8 peek(u16 addr);
+
     // --- Serial Interface (The "MAX232" side) ---
     // Call this from Main/UI to send keyboard input to the 6502
     void rx_char(u8 c);
