@@ -93,11 +93,20 @@ void mb_driver::set_machine_type(MachineType type) {
     // 3. Re-Wire Interrupts & I/O based on Schematic
     
     // --- COMMON INTERRUPT LOGIC ---
-    auto irq_handler = [this](bool state) {
-        m_cpu->set_input_line(m6502_p::IRQ_LINE, state ? 1 : 0);
-    };
-    m_via.set_irq_callback(irq_handler);
-    m_acia.set_irq_callback(irq_handler);
+    //auto irq_handler = [this](bool state) {
+    //    m_cpu->set_input_line(m6502_p::IRQ_LINE, state ? 1 : 0);
+    //};
+    m_via.set_irq_callback([this](bool state) {
+        m_via_irq_active = state;
+        resolve_cpu_irq();
+    });
+    m_acia.set_irq_callback([this](bool state) {
+        m_acia_irq_active = state;
+        resolve_cpu_irq();
+    });
+
+    //m_via.set_irq_callback(irq_handler);
+    //m_acia.set_irq_callback(irq_handler); // Wires the ACIA Pin 26 to CPU pin 4
 
 
     // --- SCHEMATIC SPECIFIC WIRING ---
@@ -143,19 +152,19 @@ void mb_driver::set_machine_type(MachineType type) {
 
         m_via.set_port_b_callback([this](u8 data) {
             // Mask out the control bits to get just the 4-bit data (PB0-PB3)
-            m_port_b_data = data & 0x0F;
+            m_port_b_data = (u8)((data & 0x0F) << 4);
 
             // Extracting the Control Pins
-            bool rs = (data & 0x10); // Bit 4
-            bool rw = (data & 0x20); // Bit 5
-            bool e  = (data & 0x40); // Bit 6
+            bool rs = (data & 0x10) != 0; // Bit 4
+            bool rw = (data & 0x20) != 0; // Bit 5
+            bool e  = (data & 0x40) != 0; // Bit 6
 
             // The HD44780 LCD reads data exactly when the Enable pin goes from HIGH to LOW.
-            if (m_last_e_state && !e) {
+            //if (m_last_e_state && !e) {
                 // The LCD class takes (data, rs, rw) like the 8-bit version does
                 m_lcd.write_4bit(m_port_b_data, rs, rw, e);
-            }
-            m_last_e_state = e;
+            //}
+           // m_last_e_state = e;
             
         });
     }
@@ -170,6 +179,7 @@ void mb_driver::reset() {
     //m_rom.reset_memory(); // Optional, usually ROM doesn't reset
     m_ram.reset_memory();
     m_via.reset();
+    m_acia.reset();
 
     // 2. Clear Interrupt Lines (Crucial Fix for "Stuck at 8000")
     // If these are floating or 1, the CPU gets stuck in an interrupt loop.
@@ -190,7 +200,7 @@ void mb_driver::run(int cycles) {
     m_via.clock();
 
     // Drain the ACIA's transmit buffer to the physical COM Port
-    if (m_serial_port) {
+    if (m_serial_port && m_current_type == MachineType::SCHEMATIC_2_SERIAL) {
         m_serial_port->update();
     }
 
@@ -207,16 +217,27 @@ void mb_driver::map_setup(address_map& map) {
      auto read_logic = [this](u16 addr) -> u8 {
         // Common ROM
         if (addr >= 0x8000) return m_rom.read(addr - 0x8000);
+
+        // Ben brings up a situation that we do not what to happen in the hardware.
+        // Because the ACIA is using A15-A12, with the bits being as follows
+        // A15 = 0, A14 = 1, A13 = 0, A12 = 1 
+        // And the VIA is also using these Address line where the bits are
+        // A15 = 0, A14 = 1, A13 = 1, A12 = 0
+        // We don't want A15 to A12 to enable both chips at the same time.
+        // So I'm going to add a safety net to catch those and return an open bus condition
+        if (addr >= 0x7000 && addr <= 0x7FFF) {
+            return 0xEA;    // NOP or Open Bus condition.
+        }
         
         // I/O Mapping Changes based on Schematic!
         if (m_current_type == MachineType::SCHEMATIC_1_BASIC) {
             // Basic: VIA at $6000
-            if (addr >= 0x6000 && addr <= 0x7FFF) return m_via.read(addr - 0x6000);
+            if (addr >= 0x6000 && addr <= 0x7FFF) return m_via.read(addr & 0x0F);//addr - 0x6000
         }
         else {
             // Serial: ACIA usually at $5000, VIA at $6000
-            if (addr >= 0x6000 && addr <= 0x7FFF) return m_via.read(addr - 0x6000);
-            if (addr >= 0x4000 && addr <= 0x5FFF) return m_acia.read(addr - 0x4000); 
+            if (addr >= 0x6000 && addr <= 0x7FFF) return m_via.read(addr & 0x0F);//addr - 0x6000
+            if (addr >= 0x5000 && addr <= 0x5FFF) return m_acia.read(addr & 0x03); //addr - 0x4000
         }
 
         // Common RAM
@@ -229,13 +250,18 @@ void mb_driver::map_setup(address_map& map) {
         if (addr >= 0x8000)      m_rom.write(addr - 0x8000, data);
         else if (addr < 0x4000)  m_ram.write(addr, data);
         else {
+            // Also need to create the safety net for write condition for 0x7000 to 0x7FFF Addresses.
+            if (addr >= 0x7000 && addr <= 0x7FFF){
+                return; // We will do nothing. 
+            }
+
             // I/O Write Logic
             if (m_current_type == MachineType::SCHEMATIC_1_BASIC) {
-                if (addr >= 0x6000) m_via.write(addr - 0x6000, data);
+                if (addr >= 0x6000 && addr <= 0x7FFF) m_via.write(addr & 0x0F, data); //addr - 0x6000
             }
             else {
-                if (addr >= 0x6000) m_via.write(addr - 0x6000, data);
-                else if (addr >= 0x4000) m_acia.write(addr - 0x4000, data);
+                if (addr >= 0x6000 && addr <= 0x7FFF) m_via.write(addr & 0x0F, data);//addr - 0x6000
+                else if (addr >= 0x5000 && addr <= 0x5FFF) m_acia.write(addr & 0x03, data);//addr - 0x4000
             }
         }
     };
@@ -246,12 +272,24 @@ void mb_driver::map_setup(address_map& map) {
     map.install_debug_handler(0x0000, 0xFFFF, [this](u16 addr) -> u8 {
         if (addr >= 0x8000) return m_rom.read(addr - 0x8000);
         if (addr < 0x4000)  return m_ram.read(addr);
+
+        // Safety Net for Addresses from 0x7000 to 0x7FFF
+        if (addr >= 0x7000 && addr >= 0x7FFF) return 0x00;
         
         // I/O Debug
-        if (addr >= 0x6000 && addr <= 0x7FFF) return m_via.peek(addr - 0x6000);
+        if (addr >= 0x6000 && addr <= 0x7FFF) return m_via.peek(addr & 0x0F);// addr - 0x6000
         if (m_current_type == MachineType::SCHEMATIC_2_SERIAL) {
-            if (addr >= 0x4000 && addr <= 0x5FFF) return m_acia.read(addr - 0x4000);
+            if (addr >= 0x5000 && addr <= 0x5FFF) return m_acia.peek(addr & 0x03);//addr - 0x4000
         }
         return 0x00;
     });
+}
+
+void mb_driver::resolve_cpu_irq() {
+    // if either the via or the acia is asseting an interrupt
+    if (m_via_irq_active || m_acia_irq_active){
+        m_cpu->set_input_line(m6502_p::IRQ_LINE, 1);
+    } else {
+        m_cpu->set_input_line(m6502_p::IRQ_LINE, 0);
+    }
 }

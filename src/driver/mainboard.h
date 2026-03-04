@@ -80,6 +80,11 @@ private:
     u8   m_port_b_data = 0x00;
     bool m_last_e_state = false;    // To detect the edge of the Enable pin
 
+    // Virtual Interrupt Wires
+    bool m_via_irq_active = false;
+    bool m_acia_irq_active = false;
+    void resolve_cpu_irq(); // This will be our wired OR logic
+
     // --- Wiring Logic ---
     void map_setup(class address_map& map);
 };
